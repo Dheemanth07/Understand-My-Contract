@@ -5,42 +5,70 @@
 // Setup type definitions for built-in Supabase Runtime APIs
 // functions/simplify-doc/index.ts
 
-declare const Deno:any;
-import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+declare const Deno: any;
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient} from "jsr:@supabase/supabase-js@2";
 
-Deno.serve(async (req:Request) => {
-  try {
-    const { text } = await req.json();
+Deno.serve(async (req: Request) => {
+    try {
+        const { text, file_name } = await req.json();
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: "You simplify legal text into plain English." },
-          { role: "user", content: text },
-        ],
-      }),
-    }).then((res) => res.json());
+        console.log("Received request to simplify text:", text);
 
-    const simplified = response.choices?.[0]?.message?.content ?? "No result";
+        const response = await fetch(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini",
+                    messages: [
+                        {
+                            role: "system",
+                            content:
+                                "You simplify legal text into plain English.",
+                        },
+                        { role: "user", content: text },
+                    ],
+                }),
+            }
+        ).then((res) => res.json());
 
-    return new Response(
-      JSON.stringify({ simplified }),
-      { headers: { "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    return new Response(
-      JSON.stringify({ error: String(err) }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
+        console.log("OpenAI response status:", response.status);
+
+        const simplified =
+            response.choices?.[0]?.message?.content ?? "No result";
+
+        const supabaseClient = createClient(
+            Deno.env.get("SUPABASE_URL")!,
+            Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")! // use service_role key for writes
+        );
+
+        const { error } = await supabaseClient
+            .from("document_analysis")
+            .insert({
+                file_name,
+                original: text,
+                simplified,
+            });
+
+        if (error) {
+            console.error("DB insert error:", error.message);
+        }
+
+        return new Response(JSON.stringify({ simplified }), {
+            headers: { "Content-Type": "application/json" },
+        });
+    } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
 });
-
 
 /* To invoke locally:
 

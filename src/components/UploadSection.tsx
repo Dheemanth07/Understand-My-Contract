@@ -105,17 +105,19 @@ const UploadSection = () => {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                    Authorization: `Bearer ${
+                        import.meta.env.VITE_SUPABASE_ANON_KEY
+                    }`,
                 },
                 body: JSON.stringify({ text }),
             }
         );
 
-        if(!response.ok){
+        if (!response.ok) {
             throw new Error(`Functin error: ${response.statusText}`);
         }
 
-        const {simplified} = await response.json();
+        const { simplified } = await response.json();
         return simplified;
     }
 
@@ -128,10 +130,15 @@ const UploadSection = () => {
         try {
             for (const file of files) {
                 //1. Upload to Supabase storage
+                // Sanitize the file name before uploading
+                const safeFileName = file.name
+                    .replace(/\s+/g, "_") // spaces → underscores
+                    .replace(/[^a-zA-Z0-9._-]/g, ""); // remove invalid chars
+
                 const { data: storageData, error: storageError } =
                     await supabase.storage
                         .from("documents") // bucket name in Supabase
-                        .upload(`docs/${file.name}`, file, {
+                        .upload(`docs/${safeFileName}`, file, {
                             upsert: true, // overwrite if same name exists
                         });
 
@@ -149,7 +156,9 @@ const UploadSection = () => {
                 console.log("Extracted Text:", extractedText);
 
                 // 3. Simplify with OpenAI (placeholder)
-                const simplifiedText = await simplifyTextWithSupabase(extractedText);
+                const simplifiedText = await simplifyTextWithSupabase(
+                    extractedText
+                );
                 console.log("Simplified Text:", simplifiedText);
 
                 // 4. Store results in Supabase
