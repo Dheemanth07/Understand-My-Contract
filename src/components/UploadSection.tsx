@@ -100,7 +100,7 @@ const UploadSection = () => {
 
     async function simplifyTextWithSupabase(text: string): Promise<string> {
         const response = await fetch(
-            `{import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/simplify-doc`,
+            `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}`,
             {
                 method: "POST",
                 headers: {

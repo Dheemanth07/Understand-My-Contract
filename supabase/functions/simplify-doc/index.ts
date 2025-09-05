@@ -7,40 +7,52 @@
 
 declare const Deno: any;
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient} from "jsr:@supabase/supabase-js@2";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*", // allow all (or restrict to your frontend origin)
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
+};
 
 Deno.serve(async (req: Request) => {
+    // Handle CORS preflight requests
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
     try {
         const { text, file_name } = await req.json();
 
         console.log("Received request to simplify text:", text);
 
+        // Call OpenAI to simplify the text
         const response = await fetch(
-            "https://api.openai.com/v1/chat/completions",
+            "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct",
             {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}`,
+                    Authorization: `Bearer ${Deno.env.get(
+                        "HUGGINGFACE_API_KEY"
+                    )}`,
                 },
                 body: JSON.stringify({
-                    model: "gpt-4o-mini",
-                    messages: [
-                        {
-                            role: "system",
-                            content:
-                                "You simplify legal text into plain English.",
-                        },
-                        { role: "user", content: text },
-                    ],
+                    inputs: `Simplify this legal text into plain understandable English. Please explain it clearly in 2-3 bullet points:\n\n${text}`,
+                    parameters: { max_new_tokens: 500, temperature: 0.3 },
                 }),
             }
-        ).then((res) => res.json());
+        );
 
-        console.log("OpenAI response status:", response.status);
+        console.log("LLaMA response status:", response.status);
 
-        const simplified =
-            response.choices?.[0]?.message?.content ?? "No result";
+        const responseData = await response.json();
+        console.log("AI response", JSON.stringify(responseData, null, 2));
+
+        let simplified = "No result";
+        if (Array.isArray(responseData) && responseData.length > 0) {
+            simplified = responseData[0].generated_text || "No result";
+        }
 
         const supabaseClient = createClient(
             Deno.env.get("SUPABASE_URL")!,
@@ -48,11 +60,11 @@ Deno.serve(async (req: Request) => {
         );
 
         const { error } = await supabaseClient
-            .from("document_analysis")
+            .from("documents_analysis")
             .insert({
                 file_name,
-                original: text,
-                simplified,
+                original_text: text,
+                simplified_text: simplified,
             });
 
         if (error) {
@@ -60,12 +72,15 @@ Deno.serve(async (req: Request) => {
         }
 
         return new Response(JSON.stringify({ simplified }), {
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+            },
         });
     } catch (err) {
         return new Response(JSON.stringify({ error: String(err) }), {
             status: 500,
-            headers: { "Content-Type": "application/json" },
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
     }
 });
