@@ -99,26 +99,19 @@ const UploadSection = () => {
     };
 
     async function simplifyTextWithSupabase(text: string): Promise<string> {
-        const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}`,
+        const { data, error } = await supabase.functions.invoke(
+            "simplify-doc",
             {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${
-                        import.meta.env.VITE_SUPABASE_ANON_KEY
-                    }`,
-                },
-                body: JSON.stringify({ text }),
+                body: { text, file_name: fileName },
             }
         );
 
-        if (!response.ok) {
-            throw new Error(`Functin error: ${response.statusText}`);
+        if (error) {
+            console.error("Function invoke error:", error.message);
+            throw new Error(error.message);
         }
 
-        const { simplified } = await response.json();
-        return simplified;
+        return data.simplified;
     }
 
     const processDocuments = async () => {
@@ -131,6 +124,7 @@ const UploadSection = () => {
             for (const file of files) {
                 //1. Upload to Supabase storage
                 // Sanitize the file name before uploading
+                setUploadProgress(10);
                 const safeFileName = file.name
                     .replace(/\s+/g, "_") // spaces → underscores
                     .replace(/[^a-zA-Z0-9._-]/g, ""); // remove invalid chars
@@ -151,36 +145,23 @@ const UploadSection = () => {
                     });
                     continue; // skip to next file
                 }
+                setUploadProgress(30);
+
                 // 2. Extract text from PDF (placeholder - implement actual extraction)
                 const extractedText = await extractTextFromPDF(file);
                 console.log("Extracted Text:", extractedText);
+                setUploadProgress(50);
 
                 // 3. Simplify with AI (placeholder)
                 const simplifiedText = await simplifyTextWithSupabase(
                     extractedText
                 );
                 console.log("Simplified Text:", simplifiedText);
+                setUploadProgress(80);
 
-                // 4. Store results in Supabase
-                const { error: dbError } = await supabase
-                    .from("documents_analysis")
-                    .insert({
-                        file_name: file.name,
-                        original_text: extractedText,
-                        simplified_text: simplifiedText,
-                    });
-
-                if (dbError) {
-                    console.error("DB insert failed:", dbError.message);
-                    toast({
-                        title: "Database error",
-                        description: dbError.message,
-                        variant: "destructive",
-                    });
-                }
+                setUploadProgress(100);
             }
 
-            setUploadProgress(100);
             setIsProcessing(false);
             toast({
                 title: "Processing complete!",
@@ -382,9 +363,9 @@ const UploadSection = () => {
                                     Your documents are secure
                                 </p>
                                 <p className="text-green-700">
-                                    Files are processed locally and never stored
-                                    on our servers. Complete privacy and
-                                    confidentiality guaranteed.
+                                    Your documents are stored securely in our
+                                    database and never shared with third
+                                    parties. We guarantee confidentiality
                                 </p>
                             </div>
                         </div>
