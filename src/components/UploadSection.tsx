@@ -155,7 +155,7 @@ const UploadSection = () => {
                 const extractedText = await extractTextFromPDF(file);
                 console.log("Extracted Text:", extractedText);
 
-                // 3. Simplify with OpenAI (placeholder)
+                // 3. Simplify with AI (placeholder)
                 const simplifiedText = await simplifyTextWithSupabase(
                     extractedText
                 );

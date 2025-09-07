@@ -1,7 +1,6 @@
 // backend/server.js
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
 const { franc } = require("franc-min");
@@ -19,7 +18,6 @@ const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 const app = express();
 app.use(cors());
 app.use(express.json()); // parse JSON
-app.use(express.urlencoded({ extended: true })); // parse urlencoded
 const upload = multer();
 
 // ---------- MongoDB Setup ----------
@@ -59,16 +57,22 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-let summarizer = null;
 let translator = null;
 
-// -------------------- Utilities --------------------
+async function initModels() {
+    if (!translator) {
+        translator = await pipeline("translation", "Xenova/m2m100_418M");
+    }
+}
+
+// Split text into sections (by paragraphs)
 function splitIntoSections(text) {
     const rawSections = text.split(/\n\s*\n|(?<=\.)\s*\n/);
     return rawSections.map((s) => s.trim()).filter(Boolean);
 }
 
-function chunkSection(section, chunkSize = 400) {
+// Chunk section for API calls
+function chunkSection(section, chunkSize = 500) {
     const chunks = [];
     let start = 0;
     while (start < section.length) {
@@ -102,7 +106,8 @@ async function translate(text, src, tgt) {
         await initModels();
         const output = await translator(text, { src_lang: src, tgt_lang: tgt });
         return output[0].translation_text;
-    } catch {
+    } catch (err) {
+        console.error("Translation failed:", err.message);
         return text;
     }
 }
@@ -112,6 +117,7 @@ async function translate(text, src, tgt) {
 async function summarizeSection(section) {
     const chunks = chunkSection(section, 500);
     if (!chunks.length) return "";
+
     const summaries = [];
     for (const chunk of chunks) {
         try {
@@ -164,19 +170,35 @@ async function lookupDefinition(word) {
     }
 }
 
-// -------------------- Upload Endpoint --------------------
-app.post("/upload-stream", upload.single("file"), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+// -------------------- ROUTES --------------------
 
-    const lang = req.query.lang || "en";
-
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-    res.flushHeaders();
-
-    let text;
+// Upload and simplify
+app.post("/upload", upload.single("file"), async (req, res) => {
     try {
+        const { authorization } = req.headers;
+        if (!authorization)
+            return res.status(401).json({ error: "No auth token" });
+
+        // Verify Supabase JWT
+        const token = authorization.replace("Bearer ", "");
+        const { data: user, error: authError } = await supabase.auth.getUser(
+            token
+        );
+        if (authError || !user?.user) {
+            return res.status(401).json({ error: "Invalid Supabase token" });
+        }
+        const userId = user.user.id;
+        if (!req.file)
+            return res.status(400).json({ error: "No file uploaded" });
+
+        const lang = req.query.lang || "en";
+
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        res.flushHeaders();
+
+        let text;
         if (req.file.mimetype === "text/plain") {
             text = req.file.buffer.toString();
         } else if (req.file.mimetype === "application/pdf") {
@@ -209,17 +231,14 @@ app.post("/upload-stream", upload.single("file"), async (req, res) => {
             return res.end();
         }
 
+        // Detect language and translate if needed
         const detectedLang = await detectLanguage(text);
         if (detectedLang === "kn") text = await translate(text, "kn", "en");
 
+        //Split and summarize
         const sections = splitIntoSections(text);
         let glossary = {};
         let collectedSections = [];
-
-        const meta = {
-            filename: req.file.originalname,
-            mimeType: req.file.mimetype,
-        };
 
         for (let i = 0; i < sections.length; i++) {
             const englishSummary = await summarizeSection(sections[i]);
@@ -242,7 +261,7 @@ app.post("/upload-stream", upload.single("file"), async (req, res) => {
                 original: sections[i],
                 summary: output || "(failed to summarize)",
                 inputLang: detectedLang,
-                outputLang: lang,
+                outputLang: req.query.lang || "en",
             };
 
             collectedSections.push({
@@ -252,39 +271,32 @@ app.post("/upload-stream", upload.single("file"), async (req, res) => {
             res.write(`data: ${JSON.stringify(msg)}\n\n`);
         }
 
+        // Save metadata to Supabase
+        const { error: supabaseError } = await supabase.from("uploads").insert({
+            user_id: userId,
+            file_name: req.file.originalname,
+            uploaded_at: new Date(),
+        });
+        if (supabaseError) {
+            console.error("Supabase insert error:", supabaseError.message);
+        }
+
         // Stream glossary at the end
         res.write(`data: ${JSON.stringify({ glossary })}\n\n`);
         res.write(`data: {"done": true}\n\n`);
 
-        // Save to MongoDB
+        // Save full analysis to MongoDB
         await Analysis.create({
-            filename: meta.filename,
-            mimeType: meta.mimeType,
-            inputLang:
-                (collectedSections[0] ? msg?.inputLang : detectedLang) ||
-                detectedLang,
-            outputLang: lang,
+            filename: req.file.originalname,
+            userId,
             sections: collectedSections,
             glossary,
         });
 
-        // Save metadata to Supabase
-        const simplifiedText = collectedSections
-            .map((s) => s.summary)
-            .join(" ");
-        await supabase.from("uploads").insert({
-            user_id: null, // change if using Supabase Auth
-            file_name: req.file.originalname,
-            original_text: text.slice(0, 2000), // store partial if too long
-            simplified_text: simplifiedText.slice(0, 2000),
-        });
-
-        console.log("✅ Saved to MongoDB + Supabase");
         res.end();
     } catch (err) {
-        console.error("Processing error:", err);
-        res.write(`data: {"error":"Processing failed"}\n\n`);
-        res.end();
+        console.error("❌ Error in /upload:", err.message);
+        res.status(500).json({ error: "Processing failed" });
     }
 });
 
