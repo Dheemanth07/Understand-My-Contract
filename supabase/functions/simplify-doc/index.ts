@@ -28,7 +28,7 @@ Deno.serve(async (req: Request) => {
 
         // Call OpenAI to simplify the text
         const response = await fetch(
-            "https://api-inference.huggingface.co/models/meta-llama/Llama-3.1-8B-Instruct",
+            "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
             {
                 method: "POST",
                 headers: {
