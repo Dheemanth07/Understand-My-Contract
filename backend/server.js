@@ -9,6 +9,7 @@ const axios = require("axios");
 const mammoth = require("mammoth");
 const mongoose = require("mongoose");
 const { createClient } = require("@supabase/supabase-js");
+const { request } = require("https");
 require("dotenv").config();
 
 const PORT = process.env.PORT || 5000;
@@ -42,6 +43,12 @@ const AnalysisSchema = new mongoose.Schema(
             {
                 original: String,
                 summary: String,
+                legalTerms: [
+                    {
+                        term: String,
+                        definition: String,
+                    },
+                ],
             },
         ],
         glossary: { type: Object, default: {} },
@@ -254,6 +261,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
                 if (!glossary[term]) {
                     glossary[term] = await lookupDefinition(term);
                 }
+                sectionTerms.push({ term, definition: glossary[term] });
             }
 
             const msg = {
@@ -262,11 +270,13 @@ app.post("/upload", upload.single("file"), async (req, res) => {
                 summary: output || "(failed to summarize)",
                 inputLang: detectedLang,
                 outputLang: req.query.lang || "en",
+                legalTerms: sectionTerms,
             };
 
             collectedSections.push({
                 original: sections[i],
                 summary: output || "",
+                legalTerms: sectionTerms,
             });
             res.write(`data: ${JSON.stringify(msg)}\n\n`);
         }
@@ -289,6 +299,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         await Analysis.create({
             filename: req.file.originalname,
             userId,
+            mimeType: req.file.mimetype,
+            inputLang: detectedLang,
+            outputLang: lang,
             sections: collectedSections,
             glossary,
         });
@@ -303,10 +316,28 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 // -------------------- History Endpoints --------------------
 app.get("/history", async (req, res) => {
     try {
-        const docs = await Analysis.find({}, { sections: 0, glossary: 0 })
+        const docs = await Analysis.find(
+            {},
+            {
+                filename: 1,
+                mimeType: 1,
+                inputLang: 1,
+                outputLang: 1,
+                createdAt: 1,
+                glossary: 1,
+                "sections.summary": 1,
+                "sections.legalTerms": 1,
+            }
+        )
             .sort({ createdAt: -1 })
             .limit(50);
-        res.json(docs);
+            .lean();
+            const formatted = docs.map((doc) => ({
+                id: doc._id,
+                title: doc.title || doc.filename || "Untitled Document",
+                createdAt: doc.createdAt,
+            }));
+        res.json(formatted);
     } catch (e) {
         console.error("History fetch failed", e);
         res.status(500).json({ error: "Failed to fetch history" });
@@ -315,12 +346,70 @@ app.get("/history", async (req, res) => {
 
 app.get("/history/:id", async (req, res) => {
     try {
-        const doc = await Analysis.findById(req.params.id);
+        const { id } = req.params;
+        const doc = await Analysis.findById(id).lean();
         if (!doc) return res.status(404).json({ error: "Not found" });
         res.json(doc);
+        res.json({
+            id: doc._id,
+            title: doc.title || doc.filename || "Untitled Document", // ✅ title for frontend
+            filename: doc.filename,
+            createdAt: doc.createdAt,
+            sections: doc.sections || [], // ✅ full sections with original/simplified/legalTerms
+        });
     } catch (e) {
         console.error("Analysis fetch failed", e);
         res.status(500).json({ error: "Failed to fetch analysis" });
+    }
+});
+
+// -------------------- SSE Proxy --------------------
+app.get("/sse", async (req, res) => {
+    try {
+        const token = req.query.token; // get token from query string
+
+        if (!token) {
+            return res.status(401).json({ error: "No auth token" });
+        }
+
+        const backendReq = request(
+            {
+                hostname: "localhost",
+                port: PORT,
+                path: "/upload?lang=en",
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                    Accept: "text/event-stream",
+                },
+            },
+            (backendRes) => {
+                res.writeHead(200, {
+                    "Content-Type": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                    Connection: "keep-alive",
+                });
+
+                backendRes.on("data", (chunk) => {
+                    res.write(chunk);
+                });
+
+                backendRes.on("end", () => {
+                    res.end();
+                });
+            }
+        );
+
+        backendReq.on("error", (err) => {
+            console.error("Proxy error:", err.message);
+            res.end();
+        });
+
+        backendReq.end();
+    } catch (err) {
+        console.error("❌ SSE proxy failed:", err.message);
+        res.status(500).end();
     }
 });
 
