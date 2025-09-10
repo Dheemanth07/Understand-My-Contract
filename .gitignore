@@ -1,4 +1,11 @@
+# =================================================================
+# Dependencies
+# =================================================================
+node_modules/
+
+# =================================================================
 # Logs
+# =================================================================
 logs
 *.log
 npm-debug.log*
@@ -6,19 +13,56 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+hs_err_pid*.log
 
-node_modules
-dist
-dist-ssr
+# =================================================================
+# Environment & Secrets 🛡️
+# =================================================================
+# Ignore all local environment variables and secrets.
+# IMPORTANT: Only commit a template file (e.g., .env.example).
+.env
+.env.*
+!.env.example
 *.local
 
-# Editor directories and files
+# =================================================================
+# Build, Cache & Test Artifacts 🧪
+# =================================================================
+# Compiled output, caches, and test reports.
+dist/
+dist-ssr/
+coverage/
+.cache/
+.next/
+.nuxt/
+.svelte-kit/
+.vercel/
+.astro/
+
+# Supabase local development artifacts
+supabase/.branches/
+supabase/.temp/
+*.tar.gz
+
+# =================================================================
+# Editor & OS Specific 💻
+# =================================================================
+# VSCode
 .vscode/*
 !.vscode/extensions.json
-.idea
-.DS_Store
+
+# JetBrains
+.idea/
+
+# Visual Studio
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+
+# Misc
 *.sw?
+
+# macOS & Windows
+.DS_Store
+Thumbs.db
