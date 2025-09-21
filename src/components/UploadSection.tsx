@@ -4,18 +4,52 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabaseClient";
-import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker?url";
+import { createClient } from "@supabase/supabase-js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const UploadSection = () => {
+if (!supabaseUrl || !supabaseAnonKey) {
+    // This check helps during development to ensure env variables are set.
+    // In a real build, this might not be reachable if variables are missing.
+    console.error(
+        "Supabase URL and Anon Key are missing from environment variables."
+    );
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+interface SectionResult {
+    section: number;
+    originalText: string;
+    simplifiedText: string;
+    legalTerms: { term: string; definition: string }[];
+}
+
+interface Glossary {
+    [key: string]: string;
+}
+
+interface UploadSectionProps {
+    onProcessComplete: (results: SectionResult[], glossary: Glossary) => void;
+}
+
+const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
     const [dragActive, setDragActive] = useState(false);
-    const [files, setFiles] = useState<File[]>([]);
-    const [uploadProgress, setUploadProgress] = useState(0);
+    const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const { toast } = useToast();
+
+    // State to store results from the backend
+    const [results, setResults] = useState<SectionResult[]>([]);
+    const [glossary, setGlossary] = useState<Glossary>({});
+    const [totalSections, setTotalSections] = useState(0);
+
+    const ALLOWED_FILE_TYPES = [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+    ];
 
     const handleDrag = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -27,153 +61,129 @@ const UploadSection = () => {
         }
     }, []);
 
-    const handleDrop = useCallback(
-        (e: React.DragEvent) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setDragActive(false);
-
-            const droppedFiles = Array.from(e.dataTransfer.files);
-            const pdfFiles = droppedFiles.filter(
-                (file) => file.type === "application/pdf"
-            );
-
-            if (pdfFiles.length > 0) {
-                setFiles(pdfFiles);
-                // Use setTimeout to avoid calling toast during render
-                setTimeout(() => {
-                    toast({
-                        title: "Files uploaded successfully",
-                        description: `${pdfFiles.length} PDF file(s) ready for processing.`,
-                    });
-                }, 0);
-            } else {
-                setTimeout(() => {
-                    toast({
-                        title: "Invalid file type",
-                        description: "Please upload PDF files only.",
-                        variant: "destructive",
-                    });
-                }, 0);
-            }
-        },
-        [toast]
-    );
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFiles = Array.from(e.target.files || []);
-        const pdfFiles = selectedFiles.filter(
-            (file) => file.type === "application/pdf"
-        );
-
-        if (pdfFiles.length > 0) {
-            setFiles(pdfFiles);
-            setTimeout(() => {
-                toast({
-                    title: "Files selected successfully",
-                    description: `${pdfFiles.length} PDF file(s) ready for processing.`,
-                });
-            }, 0);
-        }
-    };
-
-    const removeFile = (index: number) => {
-        setFiles(files.filter((_, i) => i !== index));
-    };
-
-    const extractTextFromPDF = async (file: File): Promise<string> => {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-        let text = "";
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = content.items
-                .map((item: any) => item.str)
-                .join(" ");
-            text += pageText + "\n";
-        }
-
-        return text;
-    };
-
-    async function simplifyTextWithSupabase(text: string): Promise<string> {
-        const { data, error } = await supabase.functions.invoke(
-            "simplify-doc",
-            {
-                body: { text, file_name: fileName },
-            }
-        );
-
-        if (error) {
-            console.error("Function invoke error:", error.message);
-            throw new Error(error.message);
-        }
-
-        return data.simplified;
-    }
-
-    const processDocuments = async () => {
-        if (files.length === 0) return;
-
-        setIsProcessing(true);
-        setUploadProgress(0);
-
-        try {
-            for (const file of files) {
-                //1. Upload to Supabase storage
-                // Sanitize the file name before uploading
-                setUploadProgress(10);
-                const safeFileName = file.name
-                    .replace(/\s+/g, "_") // spaces → underscores
-                    .replace(/[^a-zA-Z0-9._-]/g, ""); // remove invalid chars
-
-                const { data: storageData, error: storageError } =
-                    await supabase.storage
-                        .from("documents") // bucket name in Supabase
-                        .upload(`docs/${safeFileName}`, file, {
-                            upsert: true, // overwrite if same name exists
-                        });
-
-                if (storageError) {
-                    console.error("Upload failed:", storageError.message);
-                    toast({
-                        title: "Upload error",
-                        description: storageError.message,
-                        variant: "destructive",
-                    });
-                    continue; // skip to next file
-                }
-                setUploadProgress(30);
-
-                // 2. Extract text from PDF (placeholder - implement actual extraction)
-                const extractedText = await extractTextFromPDF(file);
-                console.log("Extracted Text:", extractedText);
-                setUploadProgress(50);
-
-                // 3. Simplify with AI (placeholder)
-                const simplifiedText = await simplifyTextWithSupabase(
-                    extractedText
-                );
-                console.log("Simplified Text:", simplifiedText);
-                setUploadProgress(80);
-
-                setUploadProgress(100);
-            }
-
-            setIsProcessing(false);
+    const handleFile = (selectedFile: File) => {
+        if (ALLOWED_FILE_TYPES.includes(selectedFile.type)) {
+            setFile(selectedFile);
+            setResults([]); // Clear previous results
+            setGlossary({});
             toast({
-                title: "Processing complete!",
-                description: "Your documents have been uploaded successfully.",
+                title: "File ready",
+                description: `${selectedFile.name} is ready for processing.`,
             });
-        } catch (err: any) {
-            console.error("Unexpected error:", err);
+        } else {
             toast({
-                title: "Unexpected error",
-                description: err.message || "Something went wrong",
+                title: "Invalid file type",
+                description: "Please upload a PDF, DOCX, or TXT file.",
                 variant: "destructive",
             });
+        }
+    };
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+        if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
+    }, []);
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) handleFile(e.target.files[0]);
+    };
+
+    const removeFile = () => {
+        setFile(null);
+        setResults([]);
+        setGlossary({});
+        setTotalSections(0);
+    };
+
+    const processDocument = async () => {
+        if (!file) return;
+
+        setIsProcessing(true);
+        setResults([]);
+        setGlossary({});
+        setTotalSections(0);
+
+        try {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            if (!session)
+                throw new Error("You must be logged in to process documents.");
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const response = await fetch(
+                "http://localhost:5000/upload?lang=en",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                    body: formData,
+                }
+            );
+
+            if (!response.ok || !response.body) {
+                const errorData = await response
+                    .json()
+                    .catch(() => ({ error: "An unknown error occurred." }));
+                throw new Error(errorData.error);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let finalResults: SectionResult[] = [];
+            let finalGlossary: Glossary = {};
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n\n");
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.done) break;
+                            if (data.glossary) {
+                                setGlossary(data.glossary);
+                                finalGlossary = data.glossary;
+                            }
+                            if (data.totalSections)
+                                setTotalSections(data.totalSections);
+                            if (data.section) {
+                                setResults((prev) => [...prev, data]);
+                                finalResults.push(data);
+                            }
+                            if (data.error) throw new Error(data.error);
+                        } catch (e) {
+                            console.error(
+                                "Failed to parse SSE JSON chunk: ",
+                                line.substring(6)
+                            );
+                        }
+                    }
+                }
+            }
+            onProcessComplete(finalResults, finalGlossary); // Pass final data up
+            toast({
+                title: "Processing complete!",
+                description: "Your document has been successfully simplified.",
+            });
+        } catch (err: any) {
+            toast({
+                title: "An error occurred",
+                description: err.message,
+                variant: "destructive",
+            });
+        } finally {
             setIsProcessing(false);
         }
     };
@@ -243,31 +253,31 @@ const UploadSection = () => {
                             <div className="space-y-2">
                                 <h3 className="text-xl font-semibold text-legal-dark">
                                     {dragActive
-                                        ? "Drop your files here"
-                                        : "Drag & drop your PDF files"}
+                                        ? "Drop your file here"
+                                        : "Drag & drop your PDF file"}
                                 </h3>
                                 <p className="text-legal-muted">
                                     or{" "}
                                     <span className="text-legal-primary font-medium cursor-pointer hover:underline">
-                                        browse to choose files
+                                        browse to choose file
                                     </span>
                                 </p>
                                 <p className="text-sm text-legal-muted">
-                                    Supports PDF files up to 10MB each
+                                    Supports PDF file up to 10MB each
                                 </p>
                             </div>
                         </div>
                     </div>
 
                     {/* File List */}
-                    {files.length > 0 && (
+                    {file.length > 0 && (
                         <div className="mt-8 space-y-4">
                             <h4 className="text-lg font-semibold text-legal-dark">
                                 Selected Files
                             </h4>
 
                             <div className="space-y-3">
-                                {files.map((file, index) => (
+                                {file.map((file, index) => (
                                     <div
                                         key={index}
                                         className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
@@ -323,7 +333,7 @@ const UploadSection = () => {
                             variant="legal"
                             size="lg"
                             onClick={processDocuments}
-                            disabled={files.length === 0 || isProcessing}
+                            disabled={file.length === 0 || isProcessing}
                             className="px-8"
                         >
                             {isProcessing ? (
@@ -332,9 +342,9 @@ const UploadSection = () => {
                                 <>
                                     <FileText className="w-5 h-5" />
                                     Process{" "}
-                                    {files.length > 0
-                                        ? `${files.length} Document${
-                                              files.length > 1 ? "s" : ""
+                                    {file.length > 0
+                                        ? `${file.length} Document${
+                                              file.length > 1 ? "s" : ""
                                           }`
                                         : "Documents"}
                                 </>

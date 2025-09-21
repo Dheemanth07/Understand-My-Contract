@@ -35,6 +35,7 @@ mongoose
 
 const AnalysisSchema = new mongoose.Schema(
     {
+        userId:{type: String, required: true, index: true },
         filename: String,
         mimeType: String,
         inputLang: String,
@@ -72,6 +73,29 @@ async function initModels() {
     }
 }
 
+// -------------------- HELPER FUNCTIONS --------------------
+
+// Extract text from various file types
+async function extractTextFromFile(file) {
+    if (!file) throw new Error("No file provided.");
+
+    if (file.mimetype === "application/pdf") {
+        const data = await pdfParse(file.buffer);
+        return data.text.trim();
+    }
+    
+    if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.originalname.endsWith(".docx")) {
+        const result = await mammoth.extractRawText({ buffer: file.buffer });
+        return result.value.trim();
+    }
+    
+    if (file.mimetype === "text/plain") {
+        return file.buffer.toString("utf8");
+    }
+
+    throw new Error("Unsupported file type");
+}
+
 // Split text into sections (by paragraphs)
 function splitIntoSections(text) {
     const rawSections = text.split(/\n\s*\n|(?<=\.)\s*\n/);
@@ -91,16 +115,11 @@ function chunkSection(section, chunkSize = 500) {
 
 // -------------------- Language Detection --------------------
 const langMap = { eng: "en", kan: "kn", hin: "hi", tam: "ta", tel: "te" };
-const allowedLangs = ["kan", "eng", "hin", "tam", "tel"];
-
-function containsKannada(text) {
-    return /[\u0C80-\u0CFF]/.test(text);
-}
 
 async function detectLanguage(text) {
     try {
-        if (containsKannada(text)) return "kn";
-        const lang3 = franc(text, { whitelist: allowedLangs, minLength: 10 });
+        if (/[\u0C80-\u0CFF]/.test(text)) return "kn";
+        const lang3 = franc(text, { whitelist: Object.keys(langMap), minLength: 10 });
         return langMap[lang3] || "en";
     } catch {
         return "en";
@@ -109,6 +128,7 @@ async function detectLanguage(text) {
 
 // -------------------- Translation --------------------
 async function translate(text, src, tgt) {
+    if(src === tgt) return text;
     try {
         await initModels();
         const output = await translator(text, { src_lang: src, tgt_lang: tgt });
@@ -121,49 +141,36 @@ async function translate(text, src, tgt) {
 
 // -------------------- Summarization --------------------
 
-async function summarizeSection(section) {
-    const chunks = chunkSection(section, 500);
-    if (!chunks.length) return "";
-
-    const summaries = [];
-    for (const chunk of chunks) {
-        try {
-            const resp = await axios.post(
-                "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
-                {
-                    inputs: `Summarize this legal text in plain English, 2-3 clear bullet points:\n\n${chunk}`,
-                    parameters: { max_new_tokens: 300, temperature: 0.3 },
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
-                        "Content-Type": "application/json",
-                    },
-                    timeout: 60000, // 60 sec timeout per chunk
-                }
-            );
-
-            // Hugging Face returns an array [{ generated_text: "..." }]
-            if (Array.isArray(resp.data) && resp.data.length > 0) {
-                summaries.push(resp.data[0].generated_text.trim());
-            } else {
-                summaries.push("(No summary returned)");
+sync function summarizeSection(section) {
+    try {
+        const resp = await axios.post(
+            "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
+            {
+                inputs: `Summarize this legal text in plain English, using clear bullet points:\n\n${section}`,
+                parameters: { max_new_tokens: 300, temperature: 0.3 },
+            },
+            {
+                headers: { Authorization: `Bearer ${HUGGINGFACE_API_KEY}` },
+                timeout: 60000,
             }
-        } catch (err) {
-            console.error("Summarization API failed:", err.message);
-            summaries.push("(Failed to summarize)");
-        }
+        );
+        return resp.data[0]?.generated_text.trim() || "(No summary returned)";
+    } catch (err) {
+        console.error("Summarization API failed:", err.message);
+        return "(Failed to summarize)";
     }
-
-    return summaries.join(" ");
 }
 
 // -------------------- Glossary Helpers --------------------
 function extractJargon(text) {
-    // Very naive: Proper nouns or legalistic words
-    const matches = text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || [];
-    return [...new Set(matches)];
+    const foundTerms = new Set();
+    const lowerText = text.toLowerCase();
+    
+    // Add capitalized words as a fallback
+    (text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []).forEach(term => foundTerms.add(term));
+    return Array.from(foundTerms);
 }
+
 
 async function lookupDefinition(word) {
     try {
@@ -184,7 +191,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     try {
         const { authorization } = req.headers;
         if (!authorization)
-            return res.status(401).json({ error: "No auth token" });
+            return res.status(401).json({ error: "No auth token provided" });
 
         // Verify Supabase JWT
         const token = authorization.replace("Bearer ", "");
@@ -195,68 +202,40 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             return res.status(401).json({ error: "Invalid Supabase token" });
         }
         const userId = user.user.id;
-        if (!req.file)
-            return res.status(400).json({ error: "No file uploaded" });
 
         const lang = req.query.lang || "en";
 
         res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Transfer-Encoding", "chunked");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
         res.flushHeaders();
 
-        let text;
-        if (req.file.mimetype === "text/plain") {
-            text = req.file.buffer.toString();
-        } else if (req.file.mimetype === "application/pdf") {
-            const data = await pdfParse(req.file.buffer);
-            text = data.text.trim();
-            if (!text) {
-                res.write(
-                    `data: {"error":"PDF contains no readable text"}\n\n`
-                );
-                return res.end();
-            } else if (
-                req.file.mimetype ===
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-                req.file.originalname.endsWith(".docx")
-            ) {
-                // DOCX support
-                const result = await mammoth.extractRawText({
-                    buffer: req.file.buffer,
-                });
-                text = result.value.trim();
-                if (!text) {
-                    res.write(
-                        `data: {"error":"DOCX contains no readable text"}\n\n`
-                    );
-                    return res.end();
-                }
-            }
-        } else {
-            res.write(`data: {"error":"Unsupported file type"}\n\n`);
-            return res.end();
+        const text = await extractTextFromFile(req.file);
+        if (!text) {
+             res.write(`data: ${JSON.stringify({ error: "File contains no readable text." })}\n\n`);
+             return res.end();
         }
-
+    
         // Detect language and translate if needed
         const detectedLang = await detectLanguage(text);
-        if (detectedLang === "kn") text = await translate(text, "kn", "en");
+        const englishText = await translate(text, detectedLang, "en");
 
         //Split and summarize
         const sections = splitIntoSections(text);
         let glossary = {};
         let collectedSections = [];
 
-        for (let i = 0; i < sections.length; i++) {
-            const englishSummary = await summarizeSection(sections[i]);
+        res.write(`data: ${JSON.stringify({ totalSections: sections.length })}\n\n`);
 
-            let output = englishSummary;
-            if (lang === "kn") {
-                output = await translate(englishSummary, "en", "kn");
-            }
+        for (let i = 0; i < sections.length; i++) {
+            const sectionText = sections[i];
+            const englishSummary = await summarizeSection(sectionText);
+            const targetLangSummary = await translate(englishSummary, "en", lang);
 
             // Extract glossary terms
-            const terms = extractJargon(sections[i]);
+            const terms = extractJargon(sectionText);
+            let sectionTerms = [];
             for (const term of terms) {
                 if (!glossary[term]) {
                     glossary[term] = await lookupDefinition(term);
@@ -264,39 +243,19 @@ app.post("/upload", upload.single("file"), async (req, res) => {
                 sectionTerms.push({ term, definition: glossary[term] });
             }
 
-            const msg = {
-                section: i + 1,
-                original: sections[i],
-                summary: output || "(failed to summarize)",
-                inputLang: detectedLang,
-                outputLang: req.query.lang || "en",
+            const sectionData = {
+                original: sectionText,
+                summary: summaryInTargetLang,
                 legalTerms: sectionTerms,
             };
+            collectedSections.push(sectionData);
 
-            collectedSections.push({
-                original: sections[i],
-                summary: output || "",
-                legalTerms: sectionTerms,
-            });
-            res.write(`data: ${JSON.stringify(msg)}\n\n`);
+            res.write(`data: ${JSON.stringify({ section: i + 1, ...sectionData })}\n\n`);
         }
-
-        // Save metadata to Supabase
-        const { error: supabaseError } = await supabase.from("uploads").insert({
-            user_id: userId,
-            file_name: req.file.originalname,
-            uploaded_at: new Date(),
-        });
-        if (supabaseError) {
-            console.error("Supabase insert error:", supabaseError.message);
-        }
-
-        // Stream glossary at the end
-        res.write(`data: ${JSON.stringify({ glossary })}\n\n`);
-        res.write(`data: {"done": true}\n\n`);
 
         // Save full analysis to MongoDB
         await Analysis.create({
+            userId,
             filename: req.file.originalname,
             userId,
             mimeType: req.file.mimetype,
@@ -306,7 +265,16 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             glossary,
         });
 
+        // Save metadata to Supabase
+        await supabase.from("uploads").insert({
+            user_id: userId,
+            file_name: req.file.originalname,
+            uploaded_at: new Date(),
+        });
+        
+        res.write(`data: {"done": true}\n\n`);
         res.end();
+
     } catch (err) {
         console.error("❌ Error in /upload:", err.message);
         res.status(500).json({ error: "Processing failed" });
@@ -314,102 +282,46 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 });
 
 // -------------------- History Endpoints --------------------
+
+async function getUserFromToken(req) {
+    const { authorization } = req.headers;
+    if (!authorization) return null;
+    const token = authorization.replace("Bearer ", "");
+    const { data: { user } } = await supabase.auth.getUser(token);
+    return user;
+}
+
 app.get("/history", async (req, res) => {
     try {
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+
         const docs = await Analysis.find(
-            {},
-            {
-                filename: 1,
-                mimeType: 1,
-                inputLang: 1,
-                outputLang: 1,
-                createdAt: 1,
-                glossary: 1,
-                "sections.summary": 1,
-                "sections.legalTerms": 1,
-            }
-        )
-            .sort({ createdAt: -1 })
-            .limit(50);
-            .lean();
-            const formatted = docs.map((doc) => ({
-                id: doc._id,
-                title: doc.title || doc.filename || "Untitled Document",
-                createdAt: doc.createdAt,
-            }));
-        res.json(formatted);
+            { userId: user.id },
+            { filename: 1, createdAt: 1, _id: 1 } // Projection
+        ).sort({ createdAt: -1 }).limit(50).lean();
+        
+        res.json(docs.map(doc => ({ id: doc._id, filename: doc.filename, createdAt: doc.createdAt })));
     } catch (e) {
-        console.error("History fetch failed", e);
         res.status(500).json({ error: "Failed to fetch history" });
     }
 });
 
 app.get("/history/:id", async (req, res) => {
     try {
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+
         const { id } = req.params;
         const doc = await Analysis.findById(id).lean();
-        if (!doc) return res.status(404).json({ error: "Not found" });
-        res.json(doc);
-        res.json({
-            id: doc._id,
-            title: doc.title || doc.filename || "Untitled Document", // ✅ title for frontend
-            filename: doc.filename,
-            createdAt: doc.createdAt,
-            sections: doc.sections || [], // ✅ full sections with original/simplified/legalTerms
-        });
-    } catch (e) {
-        console.error("Analysis fetch failed", e);
-        res.status(500).json({ error: "Failed to fetch analysis" });
-    }
-});
-
-// -------------------- SSE Proxy --------------------
-app.get("/sse", async (req, res) => {
-    try {
-        const token = req.query.token; // get token from query string
-
-        if (!token) {
-            return res.status(401).json({ error: "No auth token" });
+        
+        if (!doc || doc.userId !== user.id) {
+            return res.status(404).json({ error: "Document not found or access denied" });
         }
-
-        const backendReq = request(
-            {
-                hostname: "localhost",
-                port: PORT,
-                path: "/upload?lang=en",
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    Accept: "text/event-stream",
-                },
-            },
-            (backendRes) => {
-                res.writeHead(200, {
-                    "Content-Type": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                    Connection: "keep-alive",
-                });
-
-                backendRes.on("data", (chunk) => {
-                    res.write(chunk);
-                });
-
-                backendRes.on("end", () => {
-                    res.end();
-                });
-            }
-        );
-
-        backendReq.on("error", (err) => {
-            console.error("Proxy error:", err.message);
-            res.end();
-        });
-
-        backendReq.end();
-    } catch (err) {
-        console.error("❌ SSE proxy failed:", err.message);
-        res.status(500).end();
+        
+        res.json(doc);
+    } catch (e) {
+        res.status(500).json({ error: "Failed to fetch analysis" });
     }
 });
 
