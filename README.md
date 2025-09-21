@@ -1,183 +1,66 @@
-# Supabase CLI
+Understand My Contract: AI-Powered Legal Document Simplification
+Submission for the Gen AI Exchange Hackathon
 
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
+🌟 Project Pitch
+Understand My Contract is a web-based platform that uses Generative AI to transform dense, intimidating legal documents into simple, easy-to-understand summaries, empowering everyone to sign with clarity and confidence.
 
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
+🤔 The Problem
+Legal documents—like rental agreements, terms of service, and employment contracts—are filled with complex jargon that most people don't understand. This creates a power imbalance, often leading to individuals agreeing to unfavorable terms simply because the language is inaccessible.
 
-This repository contains all the functionality for Supabase CLI.
+✨ Our Solution
+Our platform provides a secure and user-friendly environment where anyone can upload a legal document (PDF, DOCX, or TXT) and receive an instant, AI-powered analysis. We provide:
 
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
+A side-by-side comparison of the original text next to a plain-language summary.
 
-## Getting started
+An interactive glossary that defines complex terms with a simple hover.
 
-### Install the CLI
+Multi-language support to bridge language barriers.
 
-Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
+🚀 Getting Started & How to Run
+Follow these instructions to run the project on your local machine.
 
-```bash
-npm i supabase --save-dev
-```
+Prerequisites:
 
-To install the beta release channel:
+Node.js (v18 or later)
 
-```bash
-npm i supabase@beta --save-dev
-```
+npm
 
-When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
+MongoDB Compass (with a local MongoDB server running)
 
-```
-NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
+1. Clone the repository:
 
-> **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+git clone [https://github.com/Dheemanth07/understand-my-contract.git](https://github.com/Dheemanth07/understand-my-contract.git)
+cd understand-my-contract
 
-<details>
-  <summary><b>macOS</b></summary>
+2. Configure Backend:
 
-  Available via [Homebrew](https://brew.sh). To install:
+Navigate to the backend folder: cd backend
 
-  ```sh
-  brew install supabase/tap/supabase
-  ```
+Create a .env file and add the following variables:
 
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
+MONGODB_URI=mongodb://127.0.0.1:27017
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_secret_service_key
+HUGGINGFACE_API_KEY=your_hugging_face_api_key
+PORT=5000
 
-  ```sh
-  brew upgrade supabase
-  ```
-</details>
+Install dependencies and start the server:
 
-<details>
-  <summary><b>Windows</b></summary>
+npm install
+npm start
 
-  Available via [Scoop](https://scoop.sh). To install:
+The backend will be running on http://localhost:5000.
 
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
+3. Configure Frontend:
 
-  To upgrade:
+Navigate back to the root directory: cd ..
 
-  ```powershell
-  scoop update supabase
-  ```
-</details>
+Create a .env file in the root folder and add your public Supabase keys:
 
-<details>
-  <summary><b>Linux</b></summary>
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_public_anon_key
 
-  Available via [Homebrew](https://brew.sh) and Linux packages.
+Install dependencies and start the frontend:
 
-  #### via Homebrew
-
-  To install:
-
-  ```sh
-  brew install supabase/tap/supabase
-  ```
-
-  To upgrade:
-
-  ```sh
-  brew upgrade supabase
-  ```
-
-  #### via Linux packages
-
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
-
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
-
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
-
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
-
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
-</details>
-
-<details>
-  <summary><b>Other Platforms</b></summary>
-
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
-
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
-
-  Add a symlink to the binary in `$PATH` for easier access:
-
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
-
-  This works on other non-standard Linux distros.
-</details>
-
-<details>
-  <summary><b>Community Maintained Packages</b></summary>
-
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
-
-  ```bash
-  pkgx install supabase
-  ```
-
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
-</details>
-
-### Run the CLI
-
-```bash
-supabase bootstrap
-```
-
-Or using npx:
-
-```bash
-npx supabase bootstrap
-```
-
-The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
-
-## Docs
-
-Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
-
-## Breaking changes
-
-We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
-
-However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
-
-## Developing
-
-To run from source:
-
-```sh
-# Go >= 1.22
-go run . help
-```
+npm install
+npm run dev
