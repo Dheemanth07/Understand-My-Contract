@@ -141,7 +141,7 @@ async function translate(text, src, tgt) {
 
 // -------------------- Summarization --------------------
 
-sync function summarizeSection(section) {
+async function summarizeSection(section) {
     try {
         const resp = await axios.post(
             "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2",
