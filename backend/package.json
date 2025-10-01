@@ -19,6 +19,7 @@
     "express": "^5.1.0",
     "franc-min": "^6.2.0",
     "mammoth": "^1.10.0",
+    "mongod": "^2.0.0",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
     "pdf-parse": "^1.1.1"

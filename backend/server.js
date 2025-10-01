@@ -23,9 +23,7 @@ const upload = multer();
 
 // ---------- MongoDB Setup ----------
 mongoose
-    .connect(process.env.MONGODB_URI, {
-        dbName: "legal_simplifier",
-    })
+    .connect(process.env.MONGODB_URI)
     .then(() => {
         console.log("✅ MongoDB connected");
     })
@@ -35,7 +33,7 @@ mongoose
 
 const AnalysisSchema = new mongoose.Schema(
     {
-        userId:{type: String, required: true, index: true },
+        userId: { type: String, required: true, index: true },
         filename: String,
         mimeType: String,
         inputLang: String,
@@ -83,12 +81,16 @@ async function extractTextFromFile(file) {
         const data = await pdfParse(file.buffer);
         return data.text.trim();
     }
-    
-    if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.originalname.endsWith(".docx")) {
+
+    if (
+        file.mimetype ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        file.originalname.endsWith(".docx")
+    ) {
         const result = await mammoth.extractRawText({ buffer: file.buffer });
         return result.value.trim();
     }
-    
+
     if (file.mimetype === "text/plain") {
         return file.buffer.toString("utf8");
     }
@@ -119,7 +121,10 @@ const langMap = { eng: "en", kan: "kn", hin: "hi", tam: "ta", tel: "te" };
 async function detectLanguage(text) {
     try {
         if (/[\u0C80-\u0CFF]/.test(text)) return "kn";
-        const lang3 = franc(text, { whitelist: Object.keys(langMap), minLength: 10 });
+        const lang3 = franc(text, {
+            whitelist: Object.keys(langMap),
+            minLength: 10,
+        });
         return langMap[lang3] || "en";
     } catch {
         return "en";
@@ -128,7 +133,7 @@ async function detectLanguage(text) {
 
 // -------------------- Translation --------------------
 async function translate(text, src, tgt) {
-    if(src === tgt) return text;
+    if (src === tgt) return text;
     try {
         await initModels();
         const output = await translator(text, { src_lang: src, tgt_lang: tgt });
@@ -165,12 +170,13 @@ async function summarizeSection(section) {
 function extractJargon(text) {
     const foundTerms = new Set();
     const lowerText = text.toLowerCase();
-    
+
     // Add capitalized words as a fallback
-    (text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []).forEach(term => foundTerms.add(term));
+    (text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []).forEach((term) =>
+        foundTerms.add(term)
+    );
     return Array.from(foundTerms);
 }
-
 
 async function lookupDefinition(word) {
     try {
@@ -213,10 +219,14 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
         const text = await extractTextFromFile(req.file);
         if (!text) {
-             res.write(`data: ${JSON.stringify({ error: "File contains no readable text." })}\n\n`);
-             return res.end();
+            res.write(
+                `data: ${JSON.stringify({
+                    error: "File contains no readable text.",
+                })}\n\n`
+            );
+            return res.end();
         }
-    
+
         // Detect language and translate if needed
         const detectedLang = await detectLanguage(text);
         const englishText = await translate(text, detectedLang, "en");
@@ -226,12 +236,18 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         let glossary = {};
         let collectedSections = [];
 
-        res.write(`data: ${JSON.stringify({ totalSections: sections.length })}\n\n`);
+        res.write(
+            `data: ${JSON.stringify({ totalSections: sections.length })}\n\n`
+        );
 
         for (let i = 0; i < sections.length; i++) {
             const sectionText = sections[i];
             const englishSummary = await summarizeSection(sectionText);
-            const targetLangSummary = await translate(englishSummary, "en", lang);
+            const targetLangSummary = await translate(
+                englishSummary,
+                "en",
+                lang
+            );
 
             // Extract glossary terms
             const terms = extractJargon(sectionText);
@@ -250,7 +266,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             };
             collectedSections.push(sectionData);
 
-            res.write(`data: ${JSON.stringify({ section: i + 1, ...sectionData })}\n\n`);
+            res.write(
+                `data: ${JSON.stringify({
+                    section: i + 1,
+                    ...sectionData,
+                })}\n\n`
+            );
         }
 
         // Save full analysis to MongoDB
@@ -271,10 +292,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
             file_name: req.file.originalname,
             uploaded_at: new Date(),
         });
-        
+
         res.write(`data: {"done": true}\n\n`);
         res.end();
-
     } catch (err) {
         console.error("❌ Error in /upload:", err.message);
         res.status(500).json({ error: "Processing failed" });
@@ -287,21 +307,33 @@ async function getUserFromToken(req) {
     const { authorization } = req.headers;
     if (!authorization) return null;
     const token = authorization.replace("Bearer ", "");
-    const { data: { user } } = await supabase.auth.getUser(token);
+    const {
+        data: { user },
+    } = await supabase.auth.getUser(token);
     return user;
 }
 
 app.get("/history", async (req, res) => {
     try {
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: "Authentication required" });
+        if (!user)
+            return res.status(401).json({ error: "Authentication required" });
 
         const docs = await Analysis.find(
             { userId: user.id },
             { filename: 1, createdAt: 1, _id: 1 } // Projection
-        ).sort({ createdAt: -1 }).limit(50).lean();
-        
-        res.json(docs.map(doc => ({ id: doc._id, filename: doc.filename, createdAt: doc.createdAt })));
+        )
+            .sort({ createdAt: -1 })
+            .limit(50)
+            .lean();
+
+        res.json(
+            docs.map((doc) => ({
+                id: doc._id,
+                filename: doc.filename,
+                createdAt: doc.createdAt,
+            }))
+        );
     } catch (e) {
         res.status(500).json({ error: "Failed to fetch history" });
     }
@@ -310,15 +342,18 @@ app.get("/history", async (req, res) => {
 app.get("/history/:id", async (req, res) => {
     try {
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: "Authentication required" });
+        if (!user)
+            return res.status(401).json({ error: "Authentication required" });
 
         const { id } = req.params;
         const doc = await Analysis.findById(id).lean();
-        
+
         if (!doc || doc.userId !== user.id) {
-            return res.status(404).json({ error: "Document not found or access denied" });
+            return res
+                .status(404)
+                .json({ error: "Document not found or access denied" });
         }
-        
+
         res.json(doc);
     } catch (e) {
         res.status(500).json({ error: "Failed to fetch analysis" });

@@ -6,8 +6,6 @@ import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createClient } from "@supabase/supabase-js";
 
-const [uploadProgress, setUploadProgress] = useState(0);
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -37,6 +35,7 @@ interface UploadSectionProps {
 }
 
 const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [dragActive, setDragActive] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -275,44 +274,31 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
                     {file && (
                         <div className="mt-8 space-y-4">
                             <h4 className="text-lg font-semibold text-legal-dark">
-                                Selected Files
+                                Selected File
                             </h4>
-
-                            <div className="space-y-3">
-                                {file && (
-                                    <div className="mt-8 space-y-4">
-                                        <h4 className="text-lg font-semibold text-legal-dark">
-                                            Selected File
-                                        </h4>
-                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <FileText className="w-8 h-8 text-legal-primary" />
-                                                <div>
-                                                    <p className="font-medium text-legal-dark">
-                                                        {file.name}
-                                                    </p>
-                                                    <p className="text-sm text-legal-muted">
-                                                        {formatFileSize(
-                                                            file.size
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={removeFile}
-                                                className="text-gray-500 hover:text-red-500"
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </Button>
-                                        </div>
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <FileText className="w-8 h-8 text-legal-primary" />
+                                    <div>
+                                        <p className="font-medium text-legal-dark">
+                                            {file.name}
+                                        </p>
+                                        <p className="text-sm text-legal-muted">
+                                            {formatFileSize(file.size)}
+                                        </p>
                                     </div>
-                                )}
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={removeFile}
+                                    className="text-gray-500 hover:text-red-500"
+                                >
+                                    <X className="w-4 h-4" />
+                                </Button>
                             </div>
                         </div>
                     )}
-
                     {/* Processing Progress */}
                     {isProcessing && (
                         <div className="mt-8 space-y-4">

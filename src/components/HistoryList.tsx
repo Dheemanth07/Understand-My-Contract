@@ -1,70 +1,130 @@
-import { useState, useEffect } from "react";
+// src/components/HistoryList.tsx
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText } from "lucide-react";
-import { Link } from "react-router-dom";
+import { FileText, Clock } from "lucide-react";
 
-type HistoryItem = {
+interface HistoryItem {
     id: string;
-    title: string;
+    filename: string;
     createdAt: string;
-};
+}
 
-const HistoryList = () => {
+export default function HistoryList() {
     const [history, setHistory] = useState<HistoryItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const navigate = useNavigate();
 
     useEffect(() => {
-        (async () => {
+        const fetchHistory = async () => {
             try {
-                const res = await fetch("/history");
-                if (!res.ok) throw new Error("Failed to load history");
-                const data = await res.json();
-                setHistory(data);
-            } catch (err) {
-                console.error("History fetch failed:", err);
+                // Get the user's Supabase access token
+                const { data } = await supabase.auth.getSession();
+                const token = data.session?.access_token;
+
+                if (!token) {
+                    setError("You must be logged in to view history.");
+                    return;
+                }
+
+                // Fetch user history from backend
+                const response = await fetch("http://localhost:5000/history", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (!response.ok) throw new Error("Failed to fetch history");
+
+                const dataJson = await response.json();
+                setHistory(dataJson);
+            } catch (err: any) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
             }
-        })();
+        };
+
+        fetchHistory();
     }, []);
 
-    return (
-        <section className="py-12">
-            <div className="max-w-5xl mx-auto px-6">
-                <h2 className="text-2xl font-bold mb-6">📜 Past Documents</h2>
-                {history.length === 0 ? (
-                    <p className="text-legal-muted">No past documents yet.</p>
-                ) : (
-                    <div className="grid gap-4">
-                        {history.map((doc) => (
-                            <Card
-                                key={doc.id}
-                                className="p-4 flex items-center justify-between hover:shadow-lg transition"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <FileText className="w-6 h-6 text-legal-primary" />
-                                    <div>
-                                        <h3 className="font-semibold">
-                                            {doc.title}
-                                        </h3>
-                                        <p className="text-sm text-legal-muted">
-                                            Processed on{" "}
-                                            {new Date(
-                                                doc.createdAt
-                                            ).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                </div>
-                                <Link to={`/history/${doc.id}`}>
-                                    <Button variant="outline" size="sm">
-                                        View
-                                    </Button>
-                                </Link>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center py-12 text-gray-500 animate-pulse">
+                Loading your document history...
             </div>
-        </section>
-    );
-};
+        );
+    }
 
-export default HistoryList;
+    if (error) {
+        return (
+            <div className="text-center text-red-500 py-12">
+                ⚠️ {error || "Something went wrong while fetching history."}
+            </div>
+        );
+    }
+
+    if (history.length === 0) {
+        return (
+            <div className="text-center py-12 text-gray-500">
+                No previous documents found.
+                <br />
+                <span className="text-sm">
+                    Upload your first document to get started.
+                </span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">
+                📜 Your Document History
+            </h2>
+
+            <div className="grid gap-4">
+                {history.map((item) => (
+                    <Card
+                        key={item.id}
+                        className="p-5 flex justify-between items-center bg-white shadow-sm hover:shadow-md transition cursor-pointer border border-gray-100 hover:border-legal-primary"
+                        onClick={() => navigate(`/history/${item.id}`)}
+                    >
+                        <div className="flex items-center gap-4">
+                            <FileText className="w-6 h-6 text-legal-primary" />
+                            <div>
+                                <p className="font-semibold text-gray-800">
+                                    {item.filename}
+                                </p>
+                                <div className="flex items-center text-sm text-gray-500 gap-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>
+                                        {new Date(
+                                            item.createdAt
+                                        ).toLocaleString("en-IN", {
+                                            dateStyle: "medium",
+                                            timeStyle: "short",
+                                        })}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                                e.stopPropagation(); // prevent card click
+                                navigate(`/history/${item.id}`);
+                            }}
+                        >
+                            View
+                        </Button>
+                    </Card>
+                ))}
+            </div>
+        </div>
+    );
+}

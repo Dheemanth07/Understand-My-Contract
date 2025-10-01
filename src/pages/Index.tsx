@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+
 import LegalHero from "@/components/LegalHero";
 import FeatureSection from "@/components/FeatureSection";
 import UploadSection from "@/components/UploadSection";
@@ -35,6 +38,15 @@ const Index = () => {
 
     return (
         <div className="min-h-screen">
+            {/* 3. Add the login button, perhaps in the hero section */}
+            <div className="absolute top-10 right-10 z-50">
+                <Link to="/auth">
+                    <Button className="bg-white text-blue-600 text-xl hover:bg-gray-200">
+                        Login / Sign Up
+                    </Button>
+                </Link>
+            </div>
+
             <LegalHero />
             <FeatureSection />
 

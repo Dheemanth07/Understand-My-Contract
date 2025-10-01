@@ -4,10 +4,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import HistoryList from "./components/HistoryList";
-import DocumentComparison from "./components/DocumentComparison";
+// --- Import Pages and Components ---
+import Index from "@/pages/Index";
+import AuthPage from "@/pages/AuthPage";
+import Dashboard from "@/pages/Dashboard";
+import HistoryView from "@/pages/HistoryView";
+import HistoryList from "@/components/HistoryList";
+import DocumentComparison from "@/components/DocumentComparison";
+import NotFound from "@/pages/NotFound";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -18,22 +23,43 @@ const App = () => (
             <Sonner />
             <BrowserRouter>
                 <Routes>
-                    {/* Route 1: The main page that handles uploads and shows results. */}
+                    {/* 1. Public Landing Page at the root URL */}
                     <Route path="/" element={<Index />} />
 
-                    {/* Route 2: A page to show the list of all past documents. */}
-                    <Route path="/history" element={<HistoryList />} />
+                    {/* 2. Public Login Page (unchanged) */}
+                    <Route path="/auth" element={<AuthPage />} />
 
-                    {/* Route 3: A page to show the detailed view of a specific document from history.
-                        This reuses your DocumentComparison component, which would need to be
-                        updated in the future to fetch data based on the URL's :id parameter.
-                    */}
+                    {/* --- Protected Routes --- */}
+
+                    {/* 3. Dashboard is now at a protected "/dashboard" path */}
                     <Route
-                        path="/history/:id"
-                        element={<DocumentComparison />}
+                        path="/dashboard"
+                        element={
+                            <ProtectedRoute>
+                                <Dashboard />
+                            </ProtectedRoute>
+                        }
                     />
 
-                    {/* Route 4: A catch-all for any routes that don't exist. */}
+                    <Route
+                        path="/history"
+                        element={
+                            <ProtectedRoute>
+                                <HistoryList />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/history/:id"
+                        element={
+                            <ProtectedRoute>
+                                <HistoryView />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Catch-all Route for any path that doesn't match */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>
             </BrowserRouter>
