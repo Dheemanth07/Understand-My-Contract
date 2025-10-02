@@ -1,12 +1,12 @@
 // src/pages/AuthPage.tsx
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient"; // Assuming this is your configured client instance
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
@@ -21,28 +21,8 @@ export default function AuthPage() {
         password: "",
     });
 
-    // ✅ Automatically redirect when user logs in (manual or Google)
-    useEffect(() => {
-        const checkSession = async () => {
-            const { data } = await supabase.auth.getSession();
-
-            setTimeout(() => {
-                if (data?.session?.user) navigate("/dashboard");
-            }, 500);
-        };
-
-        checkSession();
-
-        const { data: listener } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                if (session?.user) navigate("/dashboard");
-            }
-        );
-
-        return () => {
-            listener.subscription.unsubscribe();
-        };
-    }, [navigate]);
+    // The entire useEffect hook has been REMOVED.
+    // Your AuthContext and PrivateRoute now handle this logic correctly.
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -60,7 +40,9 @@ export default function AuthPage() {
                 toast({ title: "Login successful" });
                 navigate("/dashboard");
             } else {
-                const { data, error } = await supabase.auth.signUp({
+                // The ONLY thing we do on sign-up is call the signUp function.
+                // The database trigger will handle creating the profile automatically.
+                const { error } = await supabase.auth.signUp({
                     email: formData.email,
                     password: formData.password,
                     options: {
@@ -72,20 +54,14 @@ export default function AuthPage() {
                 });
                 if (error) throw error;
 
-                // ✅ Create profile entry in Supabase
-                if (data.user) {
-                    const { error: insertError } = await supabase.from("profiles").insert({
-                        user_id: data.user.id, // ✅ matches your table schema
-                        email: formData.email,
-                        username: formData.first_name + " " + formData.last_name,
-                    });
-                    if (insertError) console.error("Profile insert failed:", insertError);
-                }
+                // The manual profile insert has been REMOVED.
 
                 toast({
-                    title: "Signup successful!", 
-                    descripttion:"Please check your email to verify.",
+                    title: "Signup successful!",
+                    description:
+                        "Please check your email to verify your account.",
                 });
+                // We do NOT navigate to the dashboard here. The user must verify first.
             }
         } catch (err: any) {
             toast({
@@ -102,8 +78,8 @@ export default function AuthPage() {
         await supabase.auth.signInWithOAuth({
             provider: "google",
             options: {
-                redirectTo:
-                    "https://automatic-space-tribble-7vxrx9q7v5xhr55j-8080.app.github.dev/", // ✅ redirect back to your frontend
+                // Use a dynamic redirect path for better flexibility
+                redirectTo: window.location.origin,
             },
         });
     };
