@@ -1,5 +1,6 @@
 // src/router.jsx
 import { createBrowserRouter } from "react-router-dom";
+import AuthCallback from "./pages/AuthCallback";
 
 // --- Import your final page components ---
 import Index from "./pages/Index";
@@ -19,6 +20,10 @@ export const router = createBrowserRouter([
     {
         path: "/auth",
         element: <AuthPage />, // Correct: Single page for both login and signup
+    },
+    {
+        path: "/auth/callback",
+        element: <AuthCallback />,
     },
 
     // --- Protected Routes ---

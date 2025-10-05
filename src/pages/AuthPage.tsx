@@ -79,7 +79,7 @@ export default function AuthPage() {
             provider: "google",
             options: {
                 // Use a dynamic redirect path for better flexibility
-                redirectTo: window.location.origin,
+                redirectTo: `${window.location.origin}/auth/callback`,
             },
         });
     };
