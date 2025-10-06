@@ -69,7 +69,7 @@ const Footer = () => {
         {/* Bottom Section */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-legal-light/60">
-            <p>&copy; 2024 LegalSimplify. All rights reserved.</p>
+            <p>&copy; 2025 LegalSimplify. All rights reserved.</p>
             <div className="flex gap-4">
               <a href="#" className="hover:text-legal-secondary transition-colors flex items-center gap-1">
                 <Shield className="w-3 h-3" />

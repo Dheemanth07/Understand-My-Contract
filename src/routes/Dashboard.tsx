@@ -1,5 +1,5 @@
 // src/routes/Dashboard.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DocumentComparison from "@/components/DocumentComparison";
+import Logo from "@/components/Logo";
 
 // This should be in your .env file
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
@@ -85,6 +86,7 @@ export default function Dashboard() {
             setIsComplete(false);
             const formData = new FormData();
             formData.append("file", file);
+
             const response = await fetch(`${BACKEND_URL}/upload`, {
                 method: "POST",
                 headers: { Authorization: `Bearer ${session.access_token}` },
@@ -93,9 +95,11 @@ export default function Dashboard() {
             if (!response.ok || !response.body) {
                 throw new Error(`Server responded with ${response.status}`);
             }
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -122,9 +126,6 @@ export default function Dashboard() {
             }
         } catch (err: any) {
             console.error("Upload failed:", err);
-            if (err.response) {
-                console.error("Server response:", err.response.data);
-            }
             toast({
                 title: "Upload Failed",
                 description: err.message || "An error occurred.",
@@ -132,6 +133,34 @@ export default function Dashboard() {
             });
         } finally {
             setUploading(false);
+        }
+    };
+
+    const handleDelete = async (idToDelete: string, event: MouseEvent) => {
+        event.stopPropagation();
+        if (!session?.access_token) return;
+        if (
+            !window.confirm(
+                "Are you sure you want to permanently delete this item?"
+            )
+        ) {
+            return;
+        }
+        try {
+            await axios.delete(`${BACKEND_URL}/history/${idToDelete}`, {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            setHistory((prevHistory) =>
+                prevHistory.filter((item) => item.id !== idToDelete)
+            );
+            toast({ title: "Success", description: "History item deleted." });
+        } catch (err) {
+            console.error("Failed to delete history item:", err);
+            toast({
+                title: "Error",
+                description: "Could not delete the item.",
+                variant: "destructive",
+            });
         }
     };
 
@@ -148,46 +177,13 @@ export default function Dashboard() {
         }
     };
 
-    const handleDelete = async (
-        idToDelete: string,
-        event: React.MouseEvent
-    ) => {
-        event.stopPropagation();
-        if (!session?.access_token) return;
-
-        if (
-            !window.confirm(
-                "Are you sure you want to permanently delete this item?"
-            )
-        ) {
-            return;
-        }
-
-        try {
-            await axios.delete(`${BACKEND_URL}/history/${idToDelete}`, {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-
-            setHistory((prevHistory) =>
-                prevHistory.filter((item) => item.id !== idToDelete)
-            );
-            toast({ title: "Success", description: "History item deleted." });
-        } catch (err) {
-            console.error("Failed to delete history item:", err);
-            toast({
-                title: "Error",
-                description: "Could not delete the item.",
-                variant: "destructive",
-            });
-        }
-    };
-
-    // ✅ THIS IS THE FINAL, COMBINED LAYOUT
     return (
         <div className="flex h-screen bg-gray-50">
-            {/* Sidebar with Profile and History */}
             <aside className="w-1/4 bg-white shadow-md p-6 flex flex-col justify-between border-r">
                 <div>
+                    <div className="mb-8">
+                        <Logo />
+                    </div>
                     <h2 className="text-2xl font-bold text-indigo-700 mb-2">
                         Hello, {session?.user?.email?.split("@")[0]} 👋
                     </h2>
@@ -204,12 +200,12 @@ export default function Dashboard() {
                             {history.map((item) => (
                                 <li
                                     key={item.id}
-                                    className="p-3 border rounded-md hover:bg-indigo-50 cursor-pointer"
+                                    className="p-3 border rounded-md hover:bg-indigo-50 cursor-pointer flex justify-between items-center"
                                     onClick={() =>
                                         navigate(`/history/${item.id}`)
                                     }
                                 >
-                                    <div>
+                                    <div className="flex-1 min-w-0">
                                         <p className="font-medium truncate">
                                             {item.filename}
                                         </p>
@@ -222,7 +218,7 @@ export default function Dashboard() {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-red-500 hover:bg-red-100 hover:text-red-600"
+                                        className="text-red-500 hover:bg-red-100 hover:text-red-600 ml-2"
                                         onClick={(e) =>
                                             handleDelete(item.id, e)
                                         }
@@ -245,7 +241,6 @@ export default function Dashboard() {
                 </Button>
             </aside>
 
-            {/* Main Content with Upload and Results */}
             <main className="flex-1 p-10 overflow-y-auto">
                 <Card className="p-8 shadow-lg bg-white mb-8">
                     <h1 className="text-3xl font-bold text-indigo-700 mb-6">
@@ -271,7 +266,6 @@ export default function Dashboard() {
                     </Button>
                 </Card>
 
-                {/* This section displays the results of the current upload */}
                 {analysisResults.length > 0 && (
                     <div className="mt-8">
                         <h2 className="text-2xl font-bold mb-4 text-gray-800">
