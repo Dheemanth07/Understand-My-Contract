@@ -145,7 +145,7 @@ async function summarizeSection(section) {
             return "(Configuration Error: API Key is Missing)";
         }
         const resp = await axios.post(
-            "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
+            "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
             { inputs: section },
             { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 600000 }
         );
