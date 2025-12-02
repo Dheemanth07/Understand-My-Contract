@@ -63,14 +63,6 @@ export default function SignupPage() {
         }
     };
 
-    // ✅ ADD THIS FUNCTION BACK IN
-    const signInWithGoogle = async () => {
-        await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: { redirectTo: window.location.origin },
-        });
-    };
-
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
             <Card className="p-8 w-full max-w-sm">

@@ -32,6 +32,9 @@ hs_err_pid*.log
 dist/
 dist-ssr/
 coverage/
+/.jest-cache
+/.nyc_output
+/test-results
 .cache/
 .next/
 .nuxt/

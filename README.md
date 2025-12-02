@@ -80,6 +80,59 @@ npm run dev
 The frontend will be running at the default Vite dev server URL (usually http://localhost:5173
 ).
 
+## 🧪 Testing
+
+The project uses **Jest** with **React Testing Library** for comprehensive unit testing.
+
+### Running Tests
+
+Available test commands:
+- `npm test` or `npm run test` - Run all tests once
+- `npm run test:watch` - Run tests in watch mode for development
+- `npm run test:coverage` - Run tests with coverage report
+- `npm run test:ci` - Run tests in CI mode (with coverage)
+
+### Test Structure
+
+Tests are located in `src/__tests__/` directory and organized by feature:
+- `src/__tests__/lib/` - Tests for utility functions and library code
+- `src/__tests__/hooks/` - Tests for React hooks
+- `src/__tests__/utils/` - Common test helpers and mocks
+
+### Test Files Included
+
+- `utils.test.ts` - Tests for the `cn()` class name merging utility
+- `supabaseClient.test.ts` - Tests for Supabase client initialization
+- `use-mobile.test.tsx` - Tests for the responsive mobile detection hook
+- `use-toast.test.tsx` - Tests for the toast notification system
+
+### Coverage Requirements
+
+The project maintains a **70% coverage threshold** for:
+- Branches
+- Functions
+- Lines
+- Statements
+
+View detailed coverage reports in the `coverage/` directory after running `npm run test:coverage`.
+
+### Writing Tests
+
+Example test structure:
+```typescript
+import { renderHook } from '@testing-library/react';
+import { useMyHook } from '@/hooks/useMyHook';
+
+describe('useMyHook', () => {
+  it('does something expected', () => {
+    const { result } = renderHook(() => useMyHook());
+    expect(result.current).toBe(expectedValue);
+  });
+});
+```
+
+For more information, see the [React Testing Library documentation](https://testing-library.com/react).
+
 ## 🛠 Tech Stack
 - Frontend: Vite + React
 - Backend: Node.js + Express
