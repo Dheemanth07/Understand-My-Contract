@@ -186,7 +186,7 @@ export default function Dashboard() {
                         <Logo />
                     </div>
                     <h2 className="text-2xl font-bold text-indigo-700 mb-2">
-                        Hello, {session?.user?.email?.split("@")[0]} 👋
+                        Hello, {session?.user?.user_metadata?.full_name} 👋
                     </h2>
                     <p className="text-gray-500 text-sm mb-8">
                         Welcome to your Dashboard
