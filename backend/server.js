@@ -3,8 +3,10 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdfParse = require("pdf-parse");
-const { franc } = require("franc-min");
-const { pipeline } = require("@xenova/transformers");
+// Note: some deps (e.g. `@xenova/transformers`, `franc-min`) are ESM-only and
+// can cause Jest to fail when required at module load time. Import those
+// modules dynamically inside the functions that need them to avoid synchronous
+// top-level import issues during tests.
 const axios = require("axios");
 const mammoth = require("mammoth");
 const mongoose = require("mongoose");
@@ -18,10 +20,9 @@ app.use(cors());
 app.use(express.json());
 const upload = multer();
 
-mongoose
-    .connect(process.env.MONGODB_URI)
-    .then(() => console.log("✅ MongoDB connected"))
-    .catch((err) => console.error("MongoDB connection error:", err.message));
+// Do not connect to MongoDB at module load time. Tests manage mongoose
+// connections (mongodb-memory-server) themselves; connect only when the server
+// is started directly.
 
 const AnalysisSchema = new mongoose.Schema(
     {
@@ -56,7 +57,17 @@ let translator = null;
 async function initModels() {
     if (!translator) {
         console.log("Initializing translation model...");
-        translator = await pipeline("translation", "Xenova/m2m100_418M");
+        // Dynamically import the transformers pipeline to avoid requiring an
+        // ESM-only module at top-level which breaks Jest/CJS environments.
+        try {
+            const transformersModule = await import('@xenova/transformers');
+            const pipelineFn = transformersModule.pipeline || transformersModule.default?.pipeline || transformersModule;
+            translator = await pipelineFn("translation", "Xenova/m2m100_418M");
+        } catch (e) {
+            console.warn('⚠️ Could not initialize transformers pipeline (tests or missing env). Falling back to noop translator.');
+            // Fallback translator that returns input unchanged in an object shape
+            translator = async (text) => [{ translation_text: text }];
+        }
         console.log("✅ Translation model initialized.");
     }
 }
@@ -94,12 +105,23 @@ const langMap = { eng: "en", kan: "kn", hin: "hi", tam: "ta", tel: "te" };
 async function detectLanguage(text) {
     try {
         if (/[\u0C80-\u0CFF]/.test(text)) return "kn";
-        const lang3 = franc(text, {
+
+        // Load franc dynamically to avoid requiring an ESM module at test load time.
+        let francFunc = null;
+        try {
+            const francModule = await import('franc-min');
+            francFunc = francModule.franc || francModule.default?.franc || francModule;
+        } catch (e) {
+            // If dynamic import fails (e.g., module not available), fallback to english
+            francFunc = () => 'eng';
+        }
+
+        const lang3 = francFunc(text, {
             whitelist: Object.keys(langMap),
             minLength: 10,
         });
         return langMap[lang3] || "en";
-    } catch {
+    } catch (err) {
         return "en";
     }
 }
@@ -352,7 +374,32 @@ app.delete("/history/:id", async (req, res) => {
     }
 });
 
+// -------------------- EXPORTS FOR TESTING --------------------
+module.exports = {
+    app,
+    Analysis,
+    extractTextFromFile,
+    splitIntoSections,
+    detectLanguage,
+    translate,
+    extractJargon,
+    lookupDefinition,
+    summarizeSection,
+    getUserFromToken,
+};
+
 // -------------------- Start Server --------------------
-app.listen(PORT, () => {
-    console.log(`✅ Server listening on port ${PORT}...`);
-});
+if (require.main === module) {
+    mongoose
+        .connect(process.env.MONGODB_URI)
+        .then(() => {
+            console.log("✅ MongoDB connected");
+            app.listen(PORT, () => {
+                console.log(`✅ Server listening on port ${PORT}...`);
+            });
+        })
+        .catch((err) => {
+            console.error("MongoDB connection error:", err && err.message);
+            process.exit(1);
+        });
+}

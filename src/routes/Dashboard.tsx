@@ -200,6 +200,7 @@ export default function Dashboard() {
                             {history.map((item) => (
                                 <li
                                     key={item.id}
+                                    data-testid={`history-item-${item.id}`}
                                     className="p-3 border rounded-md hover:bg-indigo-50 cursor-pointer flex justify-between items-center"
                                     onClick={() =>
                                         navigate(`/history/${item.id}`)
@@ -216,6 +217,7 @@ export default function Dashboard() {
                                         </p>
                                     </div>
                                     <Button
+                                        data-testid={`delete-history-${item.id}`}
                                         variant="ghost"
                                         size="sm"
                                         className="text-red-500 hover:bg-red-100 hover:text-red-600 ml-2"
@@ -258,17 +260,20 @@ export default function Dashboard() {
                         />
                     </div>
                     <Button
+                        data-testid="upload-button"
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
                         onClick={handleUpload}
                         disabled={uploading}
                     >
                         {uploading ? "Processing..." : "Upload & Simplify"}
+                    <Button
+                        data-testid="logout-button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleSignOut}
+                    >
+                        Logout
                     </Button>
-                </Card>
-
-                {analysisResults.length > 0 && (
-                    <div className="mt-8">
-                        <h2 className="text-2xl font-bold mb-4 text-gray-800">
                             Analysis Results
                         </h2>
                         <div className="space-y-6">

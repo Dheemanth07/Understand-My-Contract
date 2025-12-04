@@ -35,6 +35,9 @@ export default {
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
         },
+        // Ensure ts-jest transforms import.meta.env to process.env
+        babelConfig: false,
+        isolatedModules: true,
       },
     ],
   },

@@ -15,6 +15,9 @@ pnpm-debug.log*
 lerna-debug.log*
 hs_err_pid*.log
 
+# Scripts
+scripts/*.log
+
 # =================================================================
 # Environment & Secrets 🛡️
 # =================================================================
@@ -69,3 +72,11 @@ supabase/.temp/
 # macOS & Windows
 .DS_Store
 Thumbs.db
+
+# Playwright / E2E artifacts
+playwright-report/
+test-results/
+e2e/screenshots/
+e2e/videos/
+.env.test.local
+playwright/.cache/
