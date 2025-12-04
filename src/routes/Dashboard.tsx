@@ -179,6 +179,7 @@ export default function Dashboard() {
 
     return (
         <div className="flex h-screen bg-gray-50">
+            {/* --- SIDEBAR (Unchanged) --- */}
             <aside className="w-1/4 bg-white shadow-md p-6 flex flex-col justify-between border-r">
                 <div>
                     <div className="mb-8">
@@ -243,6 +244,7 @@ export default function Dashboard() {
                 </Button>
             </aside>
 
+            {/* --- MAIN CONTENT (Fixed) --- */}
             <main className="flex-1 p-10 overflow-y-auto">
                 <Card className="p-8 shadow-lg bg-white mb-8">
                     <h1 className="text-3xl font-bold text-indigo-700 mb-6">
@@ -266,14 +268,14 @@ export default function Dashboard() {
                         disabled={uploading}
                     >
                         {uploading ? "Processing..." : "Upload & Simplify"}
-                    <Button
-                        data-testid="logout-button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={handleSignOut}
-                    >
-                        Logout
                     </Button>
+                </Card>
+
+                {/* --- RESULTS SECTION --- */}
+                {/* Only show this section if we have results */}
+                {analysisResults.length > 0 && (
+                    <div className="mt-8">
+                        <h2 className="text-2xl font-bold text-indigo-700 mb-6">
                             Analysis Results
                         </h2>
                         <div className="space-y-6">
