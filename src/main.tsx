@@ -12,6 +12,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // Create the query client
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 
                     {/* This renders your entire application based on the router file */}
                     <Analytics />
+                    <SpeedInsights />
                     <RouterProvider router={router} />
                 </AuthContextProvider>
             </TooltipProvider>
