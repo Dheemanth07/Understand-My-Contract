@@ -42,6 +42,7 @@ export default function Dashboard() {
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [analysisResults, setAnalysisResults] = useState<SectionResult[]>([]);
     const [isComplete, setIsComplete] = useState(false);
+    const [language, setLanguage] = useState("en");
 
     // Fetch history when the component mounts
     useEffect(() => {
@@ -87,11 +88,16 @@ export default function Dashboard() {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await fetch(`${BACKEND_URL}/upload`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${session.access_token}` },
-                body: formData,
-            });
+            const response = await fetch(
+                `${BACKEND_URL}/upload?lang=${language}`,
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                    body: formData,
+                }
+            );
             if (!response.ok || !response.body) {
                 throw new Error(`Server responded with ${response.status}`);
             }
@@ -260,6 +266,22 @@ export default function Dashboard() {
                             }
                             className="mt-2"
                         />
+                    </div>
+                    <div className="mb-6">
+                        <Label>Output Language</Label>
+                        <select
+                            value={language} // Make sure you added the language state!
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="w-full mt-2 p-2 border rounded-md bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                            <option value="en">English (Default)</option>
+                            <option value="hi">Hindi (हिंदी)</option>
+                            <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                            <option value="ta">Tamil (தமிழ்)</option>
+                            <option value="te">Telugu (తెలుగు)</option>
+                            <option value="es">Spanish (Español)</option>
+                            <option value="fr">French (Français)</option>
+                        </select>
                     </div>
                     <Button
                         data-testid="upload-button"
