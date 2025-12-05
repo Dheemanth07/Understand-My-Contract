@@ -208,25 +208,65 @@ async function lookupDefinition(word) {
 }
 
 async function summarizeSection(section) {
-    try {
-        const apiKey = process.env.HUGGING_FACE_API_KEY;
-        if (!apiKey) {
-            console.error("Hugging Face API key is missing from .env file!");
-            return "(Configuration Error: API Key is Missing)";
-        }
-        const resp = await axios.post(
-            "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
-            { inputs: section },
-            { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 600000 }
-        );
-        return resp.data[0]?.summary_text.trim() || "(No summary returned)";
-    } catch (err) {
-        console.error("Summarization API failed:", err.message);
-        if (err.response) {
-            console.error("Error details:", err.response.data);
-        }
-        return "(Failed to summarize)";
+    const apiKey = process.env.HUGGING_FACE_API_KEY;
+    if (!apiKey) {
+        console.error("Hugging Face API key is missing from .env file!");
+        return "(Configuration Error: API Key is Missing)";
     }
+
+    // 1. TRUNCATE INPUT
+    // The free API times out if text is too long (e.g. > 3000 chars).
+    // We limit it to ensure speed and prevent 504 errors.
+    const maxLength = 3000; 
+    const textToProcess = section.length > maxLength 
+        ? section.substring(0, maxLength) 
+        : section;
+
+    let retries = 3; // Try 3 times before giving up
+
+    while (retries > 0) {
+        try {
+            const resp = await axios.post(
+                "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
+                { 
+                    inputs: textToProcess,
+                    parameters: {
+                        max_length: 150, // Force concise summary
+                        min_length: 40,
+                        do_sample: false // Deterministic is faster
+                    }
+                },
+                { 
+                    headers: { Authorization: `Bearer ${apiKey}` }, 
+                    timeout: 20000 // 20-second client timeout
+                }
+            );
+            return resp.data[0]?.summary_text.trim() || "(No summary returned)";
+
+        } catch (err) {
+            const status = err.response?.status;
+            
+            // 503 = Model Loading (Cold Start)
+            // 504 = Gateway Timeout (Server too busy)
+            if (status === 503 || status === 504) {
+                console.log(`⚠️ Summarizer busy/loading (Status ${status}). Retrying... (${retries} attempts left)`);
+                retries--;
+                // Wait 3 seconds before trying again (Exponential backoff is better, but this is simple)
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            } else {
+                // If it's a 400 or other permanent error, stop trying
+                console.error("Summarization API failed:", err.message);
+                if (err.response) console.error("Error details:", err.response.data);
+                
+                // FALLBACK FOR DEMO:
+                // Return a snippet of original text so the UI doesn't look broken
+                return `(Auto-Summary unavailable) ${textToProcess.substring(0, 200)}...`;
+            }
+        }
+    }
+    
+    // Final fallback if all retries fail
+    return `(Summary timeout) ${textToProcess.substring(0, 200)}...`;
 }
 
 async function getUserFromToken(req) {
