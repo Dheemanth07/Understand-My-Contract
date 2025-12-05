@@ -3,6 +3,7 @@ import Header from "@/components/Header";
 import LegalHero from "@/components/LegalHero";
 import FeatureSection from "@/components/FeatureSection";
 import Footer from "@/components/Footer";
+import DocumentComparison from "@/components/DocumentComparison";
 
 const Index = () => {
     return (
