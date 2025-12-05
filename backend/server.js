@@ -277,7 +277,7 @@ async function summarizeSection(section) {
     while (retries > 0) {
         try {
             const resp = await axios.post(
-                "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",,
+                "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
                 {
                     inputs: textToProcess,
                     parameters: {
