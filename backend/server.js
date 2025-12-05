@@ -11,6 +11,7 @@ const axios = require("axios");
 const mammoth = require("mammoth");
 const mongoose = require("mongoose");
 const { createClient } = require("@supabase/supabase-js");
+const { IGNORED_WORDS, LEGAL_DICTIONARY } = require("./glossaryData");
 require("dotenv").config();
 
 const PORT = process.env.PORT || 5000;
@@ -19,8 +20,8 @@ const app = express();
 const corsOptions = {
     origin: [
         "http://localhost:5173",
-        "https://understand-my-contract.vercel.app",      
-        "https://www.understand-my-contract.vercel.app"   
+        "https://understand-my-contract.vercel.app",
+        "https://www.understand-my-contract.vercel.app",
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
@@ -159,24 +160,50 @@ async function translate(text, src, tgt) {
     }
 }
 
+// --- HELPER FUNCTIONS ---
+
 function extractJargon(text) {
     const foundTerms = new Set();
-    // Regex to find capitalized words (potential jargon)
-    (text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []).forEach((term) =>
-        foundTerms.add(term)
-    );
+
+    // 1. Regex to find Capitalized words (2+ letters)
+    // We filter them immediately against your IGNORED_WORDS list
+    (text.match(/\b[A-Z][a-zA-Z]{2,}\b/g) || []).forEach((term) => {
+        // Only add if it's NOT in the ignore list and NOT a number
+        if (!IGNORED_WORDS.has(term) && isNaN(term)) {
+            foundTerms.add(term);
+        }
+    });
+
+    // 2. Also manually check for acronyms (like GDPR, TFEU)
+    // This catches terms that regex might miss or that are all-caps
+    Object.keys(LEGAL_DICTIONARY).forEach((key) => {
+        if (text.includes(key)) foundTerms.add(key);
+    });
+
     return Array.from(foundTerms);
 }
 
 async function lookupDefinition(word) {
+    // 1. Check your local LEGAL_DICTIONARY first (Fast & Accurate)
+    if (LEGAL_DICTIONARY[word]) {
+        return LEGAL_DICTIONARY[word];
+    }
+
+    // 2. Check the Free API
     try {
         const resp = await axios.get(
             `https://api.dictionaryapi.dev/api/v2/entries/en/${word}`
         );
-        const meaning = resp.data[0]?.meanings[0]?.definitions[0]?.definition;
-        return meaning || `Definition not found for ${word}`;
+        // Safely grab the first definition
+        const meanings = resp.data[0]?.meanings;
+        if (!meanings) return null;
+
+        // Return the definition string
+        return meanings[0].definitions[0].definition;
     } catch {
-        return `Definition not found for ${word}`;
+        // 3. Return NULL if failed (Instead of "Definition not found")
+        // This allows us to hide the word completely in the next step
+        return null;
     }
 }
 
@@ -247,6 +274,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         analysisId = newAnalysis._id;
 
         const sections = splitIntoSections(text);
+
+        // Start Streaming
         res.setHeader("Content-Type", "text/event-stream");
         res.flushHeaders();
         res.write(
@@ -259,7 +288,10 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         let mainGlossary = {};
 
         for (let i = 0; i < sections.length; i++) {
+            // 👇 1. DEFINE THE TEXT (This was missing)
             const sectionText = sections[i];
+
+            // 👇 2. SUMMARIZE & TRANSLATE (This was missing)
             const englishSummary = await summarizeSection(sectionText);
             const targetLangSummary = await translate(
                 englishSummary,
@@ -267,19 +299,37 @@ app.post("/upload", upload.single("file"), async (req, res) => {
                 lang
             );
 
+            // 3. EXTRACT TERMS (Now this works because sectionText exists)
             const terms = extractJargon(sectionText);
             let sectionTerms = [];
+
             for (const term of terms) {
+                // Check main glossary
                 if (!mainGlossary[term]) {
-                    mainGlossary[term] = await lookupDefinition(term);
-                    await new Promise((resolve) => setTimeout(resolve, 200));
+                    const def = await lookupDefinition(term);
+
+                    // Only save if found
+                    if (def) {
+                        mainGlossary[term] = def;
+                    }
+
+                    // Delay for API limits
+                    if (!LEGAL_DICTIONARY[term]) {
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 100)
+                        );
+                    }
                 }
-                sectionTerms.push({ term, definition: mainGlossary[term] });
+
+                // Add to section list
+                if (mainGlossary[term]) {
+                    sectionTerms.push({ term, definition: mainGlossary[term] });
+                }
             }
 
             const sectionData = {
                 original: sectionText,
-                summary: targetLangSummary,
+                summary: targetLangSummary, // Now defined
                 legalTerms: sectionTerms,
             };
 
