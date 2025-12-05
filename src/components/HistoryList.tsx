@@ -5,9 +5,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Clock } from "lucide-react";
+import { API_BASE_URL } from "@/config";
 
 interface HistoryItem {
-    id: string;
+    _id: string;
     filename: string;
     createdAt: string;
 }
@@ -31,7 +32,7 @@ export default function HistoryList() {
                 }
 
                 // Fetch user history from backend
-                const response = await fetch("http://localhost:5000/history", {
+                const response = await fetch(`${API_BASE_URL}/history`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -115,9 +116,10 @@ export default function HistoryList() {
                         <Button
                             variant="outline"
                             size="sm"
+                            key={item._id}
                             onClick={(e) => {
                                 e.stopPropagation(); // prevent card click
-                                navigate(`/history/${item.id}`);
+                                navigate(`/history/${item._id}`);
                             }}
                         >
                             View

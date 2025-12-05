@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { API_BASE_URL } from "@/config";
 
 export default function HistoryView() {
     const { id } = useParams();
@@ -23,10 +24,16 @@ export default function HistoryView() {
             setUser(data.user);
 
             try {
-                const token = (await supabase.auth.getSession()).data.session
-                    ?.access_token;
+                const { data: sessionData } = await supabase.auth.getSession();
+                const token = sessionData.session?.access_token;
+
+                if (!token) {
+                    console.error("No access token found!");
+                    // You might want to force logout or redirect here
+                    return;
+                }
                 const response = await fetch(
-                    `http://localhost:5000/history/${id}`,
+                    `${API_BASE_URL}/history/${id}`,
                     {
                         headers: {
                             Authorization: `Bearer ${token}`,

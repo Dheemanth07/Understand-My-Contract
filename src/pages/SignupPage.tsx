@@ -25,43 +25,52 @@ export default function SignupPage() {
     };
 
     const handleSignup = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        try {
-            const { data, error } = await supabase.auth.signUp({
-                email: formData.email,
-                password: formData.password,
-                options: {
-                    data: {
-                        first_name: formData.firstName,
-                        last_name: formData.lastName,
-                    },
+    e.preventDefault();
+    setLoading(true);
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+            options: {
+                data: {
+                    // Added the missing comma after the template string below
+                    full_name: `${formData.firstName} ${formData.lastName}`, 
+                    first_name: formData.firstName,
+                    last_name: formData.lastName,
                 },
-            });
-            if (error) throw error;
-            if (data.user && !data.session) {
-                toast({
-                    title: "User already exists",
-                    description:
-                        "An account with this email is already registered. Please sign in instead.",
-                    variant: "destructive",
-                });
-                return;
-            }
+            },
+        });
+
+        // 1. If user exists, Supabase usually returns an error here
+        if (error) throw error;
+
+        // 2. This is the "Success: Verification Required" state
+        if (data.user && !data.session) {
             toast({
                 title: "Signup successful!",
                 description: "Please check your email to verify your account.",
             });
-        } catch (err: any) {
-            toast({
-                title: "Error",
-                description: err.message,
-                variant: "destructive",
-            });
-        } finally {
-            setLoading(false);
+            return;
         }
-    };
+
+        // 3. This is the "Success: Auto-confirmed" state
+        toast({
+            title: "Signup successful!",
+            description: "You are now logged in.",
+        });
+
+    } catch (err: any) {
+        // 4. This catches "User already exists" errors
+        toast({
+            title: "Error",
+            // You can customize this message if err.message contains "already registered"
+            description: err.message, 
+            variant: "destructive",
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
