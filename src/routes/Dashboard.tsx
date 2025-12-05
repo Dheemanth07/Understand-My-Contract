@@ -1,5 +1,4 @@
-// src/routes/Dashboard.tsx
-import { useEffect, useState, MouseEvent } from "react";
+import { useEffect, useState, useRef, MouseEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -41,8 +40,10 @@ export default function Dashboard() {
     const [uploading, setUploading] = useState(false);
     const [loadingHistory, setLoadingHistory] = useState(true);
     const [analysisResults, setAnalysisResults] = useState<SectionResult[]>([]);
-    const [isComplete, setIsComplete] = useState(false);
     const [language, setLanguage] = useState("en");
+
+    // Ref for canceling requests
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Fetch history when the component mounts
     useEffect(() => {
@@ -81,10 +82,14 @@ export default function Dashboard() {
             });
             return;
         }
+
+        // 1. Initialize AbortController
+        abortControllerRef.current = new AbortController();
+
         try {
             setUploading(true);
             setAnalysisResults([]);
-            setIsComplete(false);
+
             const formData = new FormData();
             formData.append("file", file);
 
@@ -96,8 +101,10 @@ export default function Dashboard() {
                         Authorization: `Bearer ${session.access_token}`,
                     },
                     body: formData,
+                    signal: abortControllerRef.current.signal, // 2. Attach signal
                 }
             );
+
             if (!response.ok || !response.body) {
                 throw new Error(`Server responded with ${response.status}`);
             }
@@ -118,7 +125,6 @@ export default function Dashboard() {
                         if (jsonString) {
                             const data = JSON.parse(jsonString);
                             if (data.done) {
-                                setIsComplete(true);
                                 fetchHistory();
                                 return;
                             }
@@ -131,13 +137,29 @@ export default function Dashboard() {
                 }
             }
         } catch (err: any) {
-            console.error("Upload failed:", err);
-            toast({
-                title: "Upload Failed",
-                description: err.message || "An error occurred.",
-                variant: "destructive",
-            });
+            // 3. Handle user cancellation specifically
+            if (err.name === "AbortError") {
+                toast({
+                    title: "Stopped",
+                    description: "Document processing was stopped.",
+                });
+            } else {
+                console.error("Upload failed:", err);
+                toast({
+                    title: "Upload Failed",
+                    description: err.message || "An error occurred.",
+                    variant: "destructive",
+                });
+            }
         } finally {
+            setUploading(false);
+            abortControllerRef.current = null;
+        }
+    };
+
+    const handleStop = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
             setUploading(false);
         }
     };
@@ -185,7 +207,7 @@ export default function Dashboard() {
 
     return (
         <div className="flex h-screen bg-gray-50">
-            {/* --- SIDEBAR (Unchanged) --- */}
+            {/* --- SIDEBAR --- */}
             <aside className="w-1/4 bg-white shadow-md p-6 flex flex-col justify-between border-r">
                 <div>
                     <div className="mb-8">
@@ -250,7 +272,7 @@ export default function Dashboard() {
                 </Button>
             </aside>
 
-            {/* --- MAIN CONTENT (Fixed) --- */}
+            {/* --- MAIN CONTENT --- */}
             <main className="flex-1 p-10 overflow-y-auto">
                 <Card className="p-8 shadow-lg bg-white mb-8">
                     <h1 className="text-3xl font-bold text-indigo-700 mb-6">
@@ -270,7 +292,7 @@ export default function Dashboard() {
                     <div className="mb-6">
                         <Label>Output Language</Label>
                         <select
-                            value={language} // Make sure you added the language state!
+                            value={language}
                             onChange={(e) => setLanguage(e.target.value)}
                             className="w-full mt-2 p-2 border rounded-md bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         >
@@ -283,62 +305,31 @@ export default function Dashboard() {
                             <option value="fr">French (Français)</option>
                         </select>
                     </div>
-                    <Button
-                        data-testid="upload-button"
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                        onClick={handleUpload}
-                        disabled={uploading}
-                    >
-                        {uploading ? "Processing..." : "Upload & Simplify"}
-                    </Button>
+
+                    {/* Button Logic: Show 'Stop' if uploading, 'Upload' if idle */}
+                    {!uploading ? (
+                        <Button
+                            data-testid="upload-button"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                            onClick={handleUpload}
+                            disabled={!file}
+                        >
+                            Upload & Simplify
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="destructive"
+                            className="w-full bg-red-600 hover:bg-red-700 text-white"
+                            onClick={handleStop}
+                        >
+                            Stop Processing
+                        </Button>
+                    )}
                 </Card>
 
                 {/* --- RESULTS SECTION --- */}
-                {/* Only show this section if we have results */}
-                {analysisResults.length > 0 && (
-                    <div className="mt-8">
-                        <h2 className="text-2xl font-bold text-indigo-700 mb-6">
-                            Analysis Results
-                        </h2>
-                        <div className="space-y-6">
-                            {analysisResults.map((result, index) => (
-                                <Card
-                                    key={index}
-                                    className="p-6 bg-white shadow-lg"
-                                >
-                                    <h3 className="text-lg font-semibold text-indigo-700 mb-2">
-                                        Section {result.section}
-                                    </h3>
-                                    <p className="text-gray-700 whitespace-pre-wrap">
-                                        {result.summary}
-                                    </p>
-                                    {result.legalTerms &&
-                                        result.legalTerms.length > 0 && (
-                                            <div className="mt-4 pt-4 border-t">
-                                                <h4 className="font-semibold text-gray-600">
-                                                    Key Terms:
-                                                </h4>
-                                                <ul className="list-disc list-inside mt-2 text-sm text-gray-600">
-                                                    {result.legalTerms.map(
-                                                        (term, termIndex) => (
-                                                            <li key={termIndex}>
-                                                                <strong>
-                                                                    {term.term}:
-                                                                </strong>{" "}
-                                                                {
-                                                                    term.definition
-                                                                }
-                                                            </li>
-                                                        )
-                                                    )}
-                                                </ul>
-                                            </div>
-                                        )}
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {/* We pass the results here. If empty, DocumentComparison handles it naturally */}
+                <DocumentComparison results={analysisResults} glossary={{}} />
             </main>
         </div>
     );

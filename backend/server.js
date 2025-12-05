@@ -277,7 +277,7 @@ async function summarizeSection(section) {
     while (retries > 0) {
         try {
             const resp = await axios.post(
-                "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
+                "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",,
                 {
                     inputs: textToProcess,
                     parameters: {
@@ -370,6 +370,11 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
         const sections = splitIntoSections(text);
 
+        let isRequestCancelled = false;
+        req.on("close", () => {
+            isRequestCancelled = true;
+            console.log("❌ Client disconnected. Stopping processing.");
+        });
         // Start Streaming
         res.setHeader("Content-Type", "text/event-stream");
         res.flushHeaders();
