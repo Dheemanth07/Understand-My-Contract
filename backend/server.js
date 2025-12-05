@@ -69,7 +69,7 @@ const supabase = createClient(
 
 // -------------------- HELPER FUNCTIONS --------------------
 
-let translator = null;
+/*let translator = null;
 async function initModels() {
     if (!translator) {
         console.log("Initializing translation model...");
@@ -91,7 +91,7 @@ async function initModels() {
         }
         console.log("✅ Translation model initialized.");
     }
-}
+}*/
 
 async function extractTextFromFile(file) {
     if (!file) throw new Error("No file provided.");
@@ -150,14 +150,65 @@ async function detectLanguage(text) {
 
 async function translate(text, src, tgt) {
     if (src === tgt) return text;
-    try {
-        await initModels();
-        const output = await translator(text, { src_lang: src, tgt_lang: tgt });
-        return output[0].translation_text;
-    } catch (err) {
-        console.error("Translation failed:", err.message);
-        return text;
+
+    const apiKey = process.env.HUGGING_FACE_API_KEY;
+    if (!apiKey) {
+        console.error("Hugging Face API key is missing!");
+        return text; // Return original if config fails
     }
+
+    // 1. Truncate to avoid 504 Timeouts
+    const maxLength = 3000;
+    const textToProcess =
+        text.length > maxLength ? text.substring(0, maxLength) : text;
+
+    // 2. Retry Logic (Handles Cold Starts)
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            const resp = await axios.post(
+                "https://router.huggingface.co/hf-inference/models/facebook/m2m100_418M",
+                {
+                    inputs: textToProcess,
+                    parameters: {
+                        src_lang: src, // e.g., "en"
+                        tgt_lang: tgt, // e.g., "hi", "kn"
+                    },
+                },
+                {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                    timeout: 20000,
+                }
+            );
+
+            // The API returns an array or object depending on the model version
+            // For m2m100, it usually returns: [{ translation_text: "..." }]
+            return (
+                resp.data[0]?.translation_text ||
+                resp.data[0]?.generated_text ||
+                text
+            );
+        } catch (err) {
+            const status = err.response?.status;
+
+            if (status === 503 || status === 504) {
+                console.log(
+                    `⚠️ Translation Model Loading/Busy (Status ${status}). Retrying...`
+                );
+                retries--;
+                await new Promise((resolve) => setTimeout(resolve, 3000));
+            } else {
+                console.error(
+                    `Translation failed (${src} -> ${tgt}):`,
+                    err.message
+                );
+                // If translation fails, return the English text so the UI doesn't break
+                return text;
+            }
+        }
+    }
+
+    return text; // Fallback to English if all retries fail
 }
 
 // --- HELPER FUNCTIONS ---
@@ -217,10 +268,9 @@ async function summarizeSection(section) {
     // 1. TRUNCATE INPUT
     // The free API times out if text is too long (e.g. > 3000 chars).
     // We limit it to ensure speed and prevent 504 errors.
-    const maxLength = 3000; 
-    const textToProcess = section.length > maxLength 
-        ? section.substring(0, maxLength) 
-        : section;
+    const maxLength = 3000;
+    const textToProcess =
+        section.length > maxLength ? section.substring(0, maxLength) : section;
 
     let retries = 3; // Try 3 times before giving up
 
@@ -228,43 +278,48 @@ async function summarizeSection(section) {
         try {
             const resp = await axios.post(
                 "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
-                { 
+                {
                     inputs: textToProcess,
                     parameters: {
                         max_length: 150, // Force concise summary
                         min_length: 40,
-                        do_sample: false // Deterministic is faster
-                    }
+                        do_sample: false, // Deterministic is faster
+                    },
                 },
-                { 
-                    headers: { Authorization: `Bearer ${apiKey}` }, 
-                    timeout: 20000 // 20-second client timeout
+                {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                    timeout: 20000, // 20-second client timeout
                 }
             );
             return resp.data[0]?.summary_text.trim() || "(No summary returned)";
-
         } catch (err) {
             const status = err.response?.status;
-            
+
             // 503 = Model Loading (Cold Start)
             // 504 = Gateway Timeout (Server too busy)
             if (status === 503 || status === 504) {
-                console.log(`⚠️ Summarizer busy/loading (Status ${status}). Retrying... (${retries} attempts left)`);
+                console.log(
+                    `⚠️ Summarizer busy/loading (Status ${status}). Retrying... (${retries} attempts left)`
+                );
                 retries--;
                 // Wait 3 seconds before trying again (Exponential backoff is better, but this is simple)
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise((resolve) => setTimeout(resolve, 3000));
             } else {
                 // If it's a 400 or other permanent error, stop trying
                 console.error("Summarization API failed:", err.message);
-                if (err.response) console.error("Error details:", err.response.data);
-                
+                if (err.response)
+                    console.error("Error details:", err.response.data);
+
                 // FALLBACK FOR DEMO:
                 // Return a snippet of original text so the UI doesn't look broken
-                return `(Auto-Summary unavailable) ${textToProcess.substring(0, 200)}...`;
+                return `(Auto-Summary unavailable) ${textToProcess.substring(
+                    0,
+                    200
+                )}...`;
             }
         }
     }
-    
+
     // Final fallback if all retries fail
     return `(Summary timeout) ${textToProcess.substring(0, 200)}...`;
 }
