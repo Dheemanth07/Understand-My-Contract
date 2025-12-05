@@ -31,7 +31,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Handle the "Preflight" (OPTIONS) requests explicitly using the same options
-app.options('(.*)', cors(corsOptions));
+app.options(/^.*$/, cors(corsOptions));
 app.use(express.json());
 const upload = multer();
 
