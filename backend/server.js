@@ -19,7 +19,7 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:5173",           // Allow local development
-    "https://understand-my-contract.vercel.app/"  
+    "https://understand-my-contract.vercel.app"  
   ],
   credentials: true
 }));
