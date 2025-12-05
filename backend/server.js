@@ -16,13 +16,22 @@ require("dotenv").config();
 const PORT = process.env.PORT || 5000;
 
 const app = express();
-app.use(cors({
-  origin: [
-    "http://localhost:5173",           // Allow local development
-    "https://www.understand-my-contract.vercel.app"  
-  ],
-  credentials: true
-}));
+const corsOptions = {
+    origin: [
+        "http://localhost:5173",
+        "https://understand-my-contract.vercel.app",      
+        "https://www.understand-my-contract.vercel.app"   
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// Apply to all routes
+app.use(cors(corsOptions));
+
+// Handle the "Preflight" (OPTIONS) requests explicitly using the same options
+app.options('*', cors(corsOptions));
 app.use(express.json());
 const upload = multer();
 
@@ -66,11 +75,16 @@ async function initModels() {
         // Dynamically import the transformers pipeline to avoid requiring an
         // ESM-only module at top-level which breaks Jest/CJS environments.
         try {
-            const transformersModule = await import('@xenova/transformers');
-            const pipelineFn = transformersModule.pipeline || transformersModule.default?.pipeline || transformersModule;
+            const transformersModule = await import("@xenova/transformers");
+            const pipelineFn =
+                transformersModule.pipeline ||
+                transformersModule.default?.pipeline ||
+                transformersModule;
             translator = await pipelineFn("translation", "Xenova/m2m100_418M");
         } catch (e) {
-            console.warn('⚠️ Could not initialize transformers pipeline (tests or missing env). Falling back to noop translator.');
+            console.warn(
+                "⚠️ Could not initialize transformers pipeline (tests or missing env). Falling back to noop translator."
+            );
             // Fallback translator that returns input unchanged in an object shape
             translator = async (text) => [{ translation_text: text }];
         }
@@ -115,11 +129,12 @@ async function detectLanguage(text) {
         // Load franc dynamically to avoid requiring an ESM module at test load time.
         let francFunc = null;
         try {
-            const francModule = await import('franc-min');
-            francFunc = francModule.franc || francModule.default?.franc || francModule;
+            const francModule = await import("franc-min");
+            francFunc =
+                francModule.franc || francModule.default?.franc || francModule;
         } catch (e) {
             // If dynamic import fails (e.g., module not available), fallback to english
-            francFunc = () => 'eng';
+            francFunc = () => "eng";
         }
 
         const lang3 = francFunc(text, {
