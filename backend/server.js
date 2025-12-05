@@ -167,7 +167,7 @@ async function translate(text, src, tgt) {
     while (retries > 0) {
         try {
             const resp = await axios.post(
-                "https://api-inference.huggingface.co/models/facebook/m2m100_418M",
+                "https://router.huggingface.co/hf-inference/models/facebook/m2m100_418M",
                 {
                     inputs: textToProcess,
                     parameters: {
@@ -277,7 +277,7 @@ async function summarizeSection(section) {
     while (retries > 0) {
         try {
             const resp = await axios.post(
-                "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
+                "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn",
                 {
                     inputs: textToProcess,
                     parameters: {
