@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import DocumentComparison from "@/components/DocumentComparison";
 import Logo from "@/components/Logo";
 
 // This should be in your .env file
@@ -327,9 +326,51 @@ export default function Dashboard() {
                     )}
                 </Card>
 
-                {/* --- RESULTS SECTION --- */}
-                {/* We pass the results here. If empty, DocumentComparison handles it naturally */}
-                <DocumentComparison results={analysisResults} glossary={{}} />
+                {/* --- RESULTS SECTION (Restored to Original List Style) --- */}
+                {analysisResults.length > 0 && (
+                    <div className="mt-8">
+                        <h2 className="text-2xl font-bold text-indigo-700 mb-6">
+                            Analysis Results
+                        </h2>
+                        <div className="space-y-6">
+                            {analysisResults.map((result, index) => (
+                                <Card
+                                    key={index}
+                                    className="p-6 bg-white shadow-lg"
+                                >
+                                    <h3 className="text-lg font-semibold text-indigo-700 mb-2">
+                                        Section {result.section}
+                                    </h3>
+                                    <p className="text-gray-700 whitespace-pre-wrap">
+                                        {result.summary}
+                                    </p>
+                                    {result.legalTerms &&
+                                        result.legalTerms.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t">
+                                                <h4 className="font-semibold text-gray-600">
+                                                    Key Terms:
+                                                </h4>
+                                                <ul className="list-disc list-inside mt-2 text-sm text-gray-600">
+                                                    {result.legalTerms.map(
+                                                        (term, termIndex) => (
+                                                            <li key={termIndex}>
+                                                                <strong>
+                                                                    {term.term}:
+                                                                </strong>{" "}
+                                                                {
+                                                                    term.definition
+                                                                }
+                                                            </li>
+                                                        )
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );
