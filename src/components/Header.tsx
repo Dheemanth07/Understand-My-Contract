@@ -5,7 +5,7 @@ import logo from "@/assets/legal-icon.png";
 
 export default function Header() {
     return (
-        <header className="absolute top-0 left-0 w-full p-4 sm:p-6 flex justify-between items-center z-50 bg-white backdrop-blur-sm shadow-sm">
+        <header class="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-50 flex items-center justify-between px-6">
             {/* Left Side: Your App Name or Logo */}
             <Link to="/" className="flex items-center space-x-3">
                 {/* ⚖️ Logo icon */}
@@ -29,12 +29,13 @@ export default function Header() {
                 >
                     Sign In
                 </Link>
-                <Link to="/signup" className="text-xl font-medium text-blue-600">
-                    <Button >Get Started</Button>
+                <Link
+                    to="/signup"
+                    className="text-xl font-medium text-blue-600"
+                >
+                    <Button>Get Started</Button>
                 </Link>
             </nav>
         </header>
-
     );
-
 }
