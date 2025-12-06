@@ -4,6 +4,7 @@ import LegalHero from "@/components/LegalHero";
 import FeatureSection from "@/components/FeatureSection";
 import Footer from "@/components/Footer";
 import DocumentComparison from "@/components/DocumentComparison";
+import ChatbotButton from "@/components/ChatBotButton";
 
 const Index = () => {
     return (
@@ -14,6 +15,7 @@ const Index = () => {
             <div className="bg-gray-50/50 border-t border-b">
                 <DocumentComparison isDemo={true} />
             </div>
+            <ChatbotButton />
             <Footer />
         </div>
     );
