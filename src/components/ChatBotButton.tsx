@@ -2,8 +2,8 @@ import { MessageCircleQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function ChatbotButton() {
-    // 👇 REPLACE THIS with the actual link to your chatbot
-    const CHATBOT_URL = "https://your-chatbot-link.com";
+
+    const CHATBOT_URL = "https://legal-rights-awareness-chatbot.vercel.app";
 
     return (
         <div className="fixed bottom-8 right-8 z-50 flex items-center gap-2 group">
