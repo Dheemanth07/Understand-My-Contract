@@ -1,133 +1,138 @@
-# 📑 Understand My Contract: AI-Powered Legal Document Simplification
-**Submission for the Gen AI Exchange Hackathon**
+# ⚖️ Understand My Contract: AI-Powered Legal Document Simplification
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-Active-success.svg)
+![Stack](https://img.shields.io/badge/stack-PERN%20Stack-orange.svg)
+
+**Understand My Contract** is an AI-powered platform designed to demystify legal documents, making them accessible and understandable for everyone. By leveraging advanced NLP and full-stack engineering, the platform simplifies dense legal text through automatic processing, clarification, and translation.
 
 ---
 
-## 🌟 Project Pitch
-**Understand My Contract** is a web-based platform that uses **Generative AI** to transform dense, intimidating legal documents into **simple, easy-to-understand summaries**, empowering everyone to sign with clarity and confidence.
+## 📖 Table of Contents
+- [The "What": Project Overview](#overview)
+- [The "Why": Problem Statement](#problem)
+- [The "How": System Architecture](#architecture)
+- [Key Features](#features)
+- [Tech Stack](#stack)
+- [Getting Started](#getting-started)
+- [Future Enhancements](#enhancements)
 
 ---
 
-## 🤔 The Problem
-Legal documents—like rental agreements, terms of service, and employment contracts—are filled with complex jargon that most people don't understand.  
+## <a id="overview"></a>🧐 The "What": Project Overview
 
-This creates a **power imbalance**, often leading to individuals agreeing to **unfavorable terms** simply because the language is inaccessible.
+This platform acts as a bridge between complex legal language and user comprehension. It accepts legal documents (PDF/DOCX) and transforms them into clear, concise summaries and explanations. The system utilizes AI summarization, multilingual translation, and automated glossary generation to make legal content understandable.
 
----
-
-## ✨ Our Solution
-Our platform provides a **secure and user-friendly environment** where anyone can upload a legal document (PDF, DOCX, or TXT) and receive an **instant, AI-powered analysis**.  
-
-### Features:
-- 📃 **Side-by-side comparison** of the original text next to a plain-language summary.  
-- 📖 **Interactive glossary** that defines complex terms with a simple hover.  
-- 🌍 **Multi-language support** to bridge language barriers.  
+The application provides a side-by-side view of the original document and the simplified analysis, ensuring users can verify the information easily.
 
 ---
 
-## 🚀 Getting Started & How to Run
+## <a id="problem"></a>⚠️ The "Why": Problem Statement
 
-Follow these instructions to run the project on your local machine.
+Legal documents present significant challenges to the general public. We built this solution to address four critical pain points:
 
-### ✅ Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or later)  
-- [npm](https://www.npmjs.com/)  
-- [MongoDB Compass](https://www.mongodb.com/products/tools/compass) (with a local MongoDB server running)  
-
----
-
-### 1️⃣ Clone the Repository
-```bash
-git clone https://github.com/Dheemanth07/understand-my-contract.git
-cd understand-my-contract
-```
-### 2️⃣ Configure Backend
-Navigate to the backend folder:
-```bash
-cd backend
-```
-Create a .env file and add the following variables:
-```env
-MONGODB_URI=mongodb://127.0.0.1:27017
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_secret_service_key
-HUGGINGFACE_API_KEY=your_hugging_face_api_key
-PORT=5000
-```
-Install dependencies and start the server:
-```bash
-npm install
-npm start
-```
-The backend will be running at:
-👉 http://localhost:5000
-
-### 3️⃣ Configure Frontend
-Navigate back to the root directory:
-```bash
-cd ..
-```
-Create a .env file in the root folder. Use `.env.example` as a template and add your public Supabase keys:
-```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_ANON_KEY=your_supabase_public_anon_key
-```
-Install dependencies and start the frontend:
-```bash
-npm install
-npm run dev
-```
-The frontend will be running at the default Vite dev server URL (usually http://localhost:5173).
+1.  **Complexity & Inaccessibility:** Legal documents are dense and laden with jargon, making them inherently difficult for non-professionals to comprehend.
+2.  **Prohibitive Legal Fees:** Seeking professional counsel for simple interpretation is costly, creating a barrier to justice.
+3.  **Language Barriers:** In multilingual environments, critical legal information is often lost or misunderstood in translation.
+4.  **Lack of Clarity:** Ambiguity in contracts leads to disputes and misinterpretations for individuals and businesses alike.
 
 ---
 
-## ⚙️ Configuration & Validation
-This project includes scripts to validate configurations and ensure consistency.
+## <a id="architecture"></a>🏗 The "How": System Architecture
 
-### Configuration Documentation
-For a deep dive into the project's setup, see the detailed documentation:
-- **[Configuration Details (`docs/CONFIGURATION.md`)]**
-- **[Testing Strategy (`docs/TESTING.md`)]**
-- **[CI/CD Pipeline (`docs/CI_CD.md`)]**
+The platform follows a secure, scalable architecture.
 
-### Validation Scripts
-- `npm run validate:config` - Validates all configuration files (TypeScript, ESLint, Tailwind, etc.).
-- `npm run validate:env` - Checks for required environment variables.
-- `npm run typecheck` - Runs the TypeScript compiler to check for type errors.
-- `npm run validate:all` - Runs all validation checks together.
+### Data Flow
+1.  **Upload:** User uploads a legal document (PDF/Word) via the frontend.
+2.  **Security:** The system performs secure document ingestion and virus scanning.
+3.  **Processing:** The backend extracts raw text using parsers and segments it into sections.
+4.  **AI Analysis:** The AI Engine processes the text for summarization (BART) and jargon extraction.
+5.  **Real-Time Delivery:** Results, including translations and glossary terms, are streamed back to the user interface via Server-Sent Events (SSE).
+6.  **Storage:** Analysis data is auto-saved to the user's secure history in MongoDB.
 
 ---
 
-## 🧪 Testing
-The project uses **Jest** for unit testing and **Playwright** for end-to-end (E2E) testing.
+## <a id="features"></a>🚀 Key Features
 
-For a complete guide, please read **[`docs/TESTING.md`](./docs/TESTING.md)**.
-
-### Quick Commands
-- `npm test` - Run unit tests.
-- `npm run test:coverage` - Generate a coverage report.
-- `npm run test:e2e` - Run E2E tests (headless).
-
-### Build Testing
-- `npm run test:build` - Validates Vite builds in both development and production modes.
+* **AI Summarization:** Leverages Hugging Face BART to generate concise, accurate summaries of key clauses and obligations.
+* **Multilingual Translation:** Powered by Xenova M2M-100 to convert summaries into various languages.
+* **Jargon Extraction:** Automatically identifies and defines complex legal terminology using an in-built glossary.
+* **Real-time Updates:** Uses Server-Sent Events (SSE) to provide live progress updates and results without page reloads.
+* **Secure Authentication:** Robust user login and session management via Supabase Auth and JWTs.
+* **Document History:** Users can access a comprehensive record of all their previously processed documents.
 
 ---
 
-## 🤖 CI/CD Pipeline
-All pushes and pull requests to `main` and `develop` trigger an automated CI/CD pipeline using GitHub Actions. This workflow runs all validation, linting, testing, and build checks.
+## <a id="stack"></a>🛠 Tech Stack
 
-For more details, see **[`docs/CI_CD.md`](./docs/CI_CD.md)**.
+This project is built using a robust full-stack configuration.
+
+### Frontend
+* **Framework:** React.js
+* **Language:** TypeScript
+* **Build Tool:** Vite
+* **Styling:** Tailwind CSS
+
+### Backend
+* **Runtime:** Node.js
+* **Framework:** Express.js
+* **File Processing:** Multer (uploads), pdf-parse, mammoth (DOCX)
+
+### AI & Data
+* **AI Models:** Hugging Face API (BART for summary, M2M-100 for translation).
+* **Database:** MongoDB (Data storage), Supabase (Auth & DB).
+* **Authentication:** Supabase Auth.
 
 ---
 
-## 🛠 Tech Stack
-- Frontend: Vite + React
-- Backend: Node.js + Express
-- Database: MongoDB
-- Authentication & Storage: Supabase
-- AI Models: Hugging Face APIs
-  
-## 🙌 Acknowledgments
-- Supabase for authentication & database tools.
-- Hugging Face for AI model APIs.
-- MongoDB for scalable database solutions.
+## <a id="getting-started"></a>⚡ Getting Started
+
+### Prerequisites
+* Node.js
+* Supabase Account (Free Tier)
+* MongoDB Atlas Account (Free Tier)
+* Hugging Face API Token (Free Access)
+
+### Installation
+
+1.  **Clone the repo**
+    ```bash
+    git clone https://github.com/Dheemanth07/understand-my-contract.git
+    ```
+
+2.  **Install dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Configure Environment Variables**
+    Create a `.env` file and add your credentials:
+    ```env
+    PORT=3000
+    SUPABASE_URL=your_supabase_url
+    SUPABASE_KEY=your_supabase_key
+    MONGODB_URI=your_mongodb_uri
+    HUGGING_FACE_TOKEN=your_token
+    JWT_SECRET=your_secret
+    ```
+
+4.  **Run the App**
+    ```bash
+    npm run dev
+    ```
+
+---
+
+## <a id="enhancements"></a>🔮 Future Enhancements
+
+We are continuously working to expand the platform's capabilities:
+* **OCR Integration:** To process scanned image-based legal documents.
+* **Voice-Based Explanations:** Audio summaries for enhanced accessibility.
+* **Chatbot Assistant:** A GPT-powered Q&A chat for real-time questions about the document.
+* **Legal Research API:** Integration with legal databases for case precedents.
+
+---
+
+## 📄 License
+
+Distributed under the MIT License.
