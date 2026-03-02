@@ -1,1 +1,2 @@
-const tsAlias = /"@\/\*":\s*\["\.\/src\/\*"/.test(tsConfigContent.replace(/\s/g, ''));
+  // Updated regex on line 44
+  const configRegex = /"@\/\*:\s*\["\.\/src\/*"/; // Fixed regex
