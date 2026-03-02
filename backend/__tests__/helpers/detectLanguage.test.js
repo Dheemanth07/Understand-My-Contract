@@ -2,18 +2,22 @@
  * Unit tests for detectLanguage helper function
  */
 
-// Mock franc-min before importing the function
-jest.mock('franc-min', () => ({
-  franc: jest.fn((text, options) => {
-    // Mock franc language detection
+// Mock franc-min before importing the function; export a function directly
+// so that require() returns a callable mock (compatible with our helper's
+// require-based import). This also makes jest.fn methods work as expected.
+jest.mock('franc-min', () => {
+  const fn = jest.fn((text, options) => {
+    // simple heuristic similar to earlier behavior
     if (text.includes('hello') || text.includes('english')) return 'eng';
     if (text.includes('namaste') || text.includes('hindi')) return 'hin';
     if (text.includes('vanakkam') || text.includes('tamil')) return 'tam';
     if (text.includes('namaskara') || text.includes('kannada')) return 'kan';
     return 'eng';
-  }),
-}));
+  });
+  return fn;
+});
 const franc = require('franc-min');
+
 
 const { detectLanguage } = require('../../server');
 const { resetAllMocks } = require('../../testUtils/mocks');

@@ -41,7 +41,7 @@ if (fs.existsSync(viteConfigPath) && fs.existsSync(tsConfigPath)) {
 
   // A bit simplistic, but good enough for this project's convention.
   const viteAlias = /@\/\*":\s*".\/src\/\*/.test(viteConfigContent);
-  const tsAlias = /"@\/\*":\s*\[".\/src\/"\ Integration]/).test(tsConfigContent.replace(/\s/g, ''));
+  const tsAlias = /"@\/\*":\s*\[".\/src\/\*"/.test(tsConfigContent.replace(/\s/g, ''));
 
   if (!viteAlias || !tsAlias) {
     console.error('Error: Path alias "@/*" is not consistently configured in vite.config.ts and tsconfig.json.');
