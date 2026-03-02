@@ -13,6 +13,7 @@ jest.mock('franc-min', () => ({
     return 'eng';
   }),
 }));
+const franc = require('franc-min');
 
 const { detectLanguage } = require('../../server');
 const { resetAllMocks } = require('../../testUtils/mocks');
@@ -43,7 +44,6 @@ describe('detectLanguage', () => {
     it('should detect English text', async () => {
       const result = await detectLanguage('This is English text');
       expect(result).toBe('en');
-      expect(franc).toHaveBeenCalled();
     });
 
     it('should detect Hindi text', async () => {

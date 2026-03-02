@@ -3,9 +3,10 @@
  */
 
 // Mock external dependencies before importing the function
-jest.mock('pdf-parse');
-jest.mock('mammoth');
+jest.mock('pdf-parse', () => jest.fn());
+jest.mock('mammoth', () => ({ extractRawText: jest.fn() }));
 
+// after mocking we can require normally
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
 const { extractTextFromFile } = require('../../server');

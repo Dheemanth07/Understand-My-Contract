@@ -181,7 +181,9 @@ describe('GET /history/:id', () => {
   describe('Error Handling', () => {
     it('should return 500 on database error', async () => {
       const mockFindById = jest.spyOn(Analysis, 'findById')
-        .mockRejectedValueOnce(new Error('DB connection failed'));
+        .mockReturnValueOnce({
+          lean: jest.fn().mockRejectedValueOnce(new Error('DB connection failed')),
+        });
 
       const res = await request(app)
         .get(`/history/${testDoc._id}`)

@@ -232,6 +232,7 @@ describe('DELETE /history/:id', () => {
 
       // Verify both are gone
       const count = await Analysis.countDocuments({ userId: 'user-123' });
+      // after deleting two documents, count should be 0. if not, log results
       expect(count).toBe(0);
     });
 

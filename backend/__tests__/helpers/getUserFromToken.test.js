@@ -181,6 +181,9 @@ describe('getUserFromToken', () => {
         data: { user: null },
         error: new Error('Network error'),
       }));
+      // replace the client used by auth util as well
+      const authUtil = require('../../src/utils/auth');
+      authUtil.__setSupabaseClient && authUtil.__setSupabaseClient(mockClient);
 
       const req = {
         headers: {

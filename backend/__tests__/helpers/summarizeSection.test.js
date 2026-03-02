@@ -8,7 +8,7 @@ jest.mock('axios', () => ({
 
 const { summarizeSection } = require('../../server');
 const axios = require('axios');
-const { resetAllMocks } = require('../../testUtils/mocks');
+const { resetAllMocks, mockAxios } = require('../../testUtils/mocks');
 
 describe('summarizeSection', () => {
   beforeEach(() => {

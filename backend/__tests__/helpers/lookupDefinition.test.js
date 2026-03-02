@@ -59,7 +59,10 @@ describe('lookupDefinition', () => {
       const result = await lookupDefinition('test');
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
-      expect(result).toContain('test') || expect(result).toContain('procedure');
+      // should contain either keyword, so test both separately
+      expect(
+        result.includes('test') || result.includes('procedure')
+      ).toBe(true);
     });
 
     it('should call API with correct URL', async () => {
@@ -88,7 +91,7 @@ describe('lookupDefinition', () => {
   describe('Word Not Found', () => {
     it('should return fallback message for unknown word', async () => {
       const result = await lookupDefinition('unknown-word');
-      expect(result).toContain('Definition not found') || expect(result).toContain('not found');
+      expect(result).toBe('(Definition not found)');
     });
 
     it('should handle API 404 response', async () => {
@@ -122,28 +125,25 @@ describe('lookupDefinition', () => {
 
   describe('Error Handling', () => {
     it('should return fallback on network error', async () => {
-      // Simulate network error by mocking rejection
-      const originalGet = mockAxios.get;
-      mockAxios.get = jest.fn(async () => {
+      const originalGet = axios.get;
+      axios.get = jest.fn(async () => {
         throw new Error('Network error');
       });
-
       const result = await lookupDefinition('test');
-      expect(result).toContain('Definition not found');
-
-      mockAxios.get = originalGet;
+      expect(result).toBe('(Definition not found)');
+      axios.get = originalGet;
     });
 
     it('should return fallback on timeout', async () => {
-      const originalGet = mockAxios.get;
-      mockAxios.get = jest.fn(async () => {
-        throw new Error('Timeout');
+      const originalGet = axios.get;
+      axios.get = jest.fn(async () => {
+        const err = new Error('Timeout');
+        err.code = 'ECONNABORTED';
+        throw err;
       });
-
       const result = await lookupDefinition('test');
-      expect(result).toContain('Definition not found');
-
-      mockAxios.get = originalGet;
+      expect(result).toBe('(Definition not found)');
+      axios.get = originalGet;
     });
 
     it('should return fallback on malformed response', async () => {
@@ -155,7 +155,7 @@ describe('lookupDefinition', () => {
   describe('Edge Cases', () => {
     it('should handle empty string word', async () => {
       const result = await lookupDefinition('');
-      expect(result).toContain('Definition not found');
+      expect(result).toBe('(Definition not found)');
     });
 
     it('should handle word with special characters', async () => {

@@ -33,20 +33,32 @@ function splitIntoSections(text) {
 
 async function detectLanguage(text) {
     try {
+        // quick check for Kannada script (uses unicode range)
         if (/[\u0C80-\u0CFF]/.test(text)) return "kn";
-        let francFunc = null;
+
+        let francFunc;
         try {
-            const francModule = await import("franc-min");
-            francFunc = francModule.franc || francModule.default?.franc || francModule;
+            // use require so that jest.mock can intercept this import
+            // (dynamic import in tests was returning an object and breaking mocks)
+            const francModule = require("franc-min");
+            // the module may export a function directly or an object with a
+            // `franc` property (depending on how it's mocked), so handle both.
+            francFunc =
+                typeof francModule === "function"
+                    ? francModule
+                    : francModule.franc || francModule.default?.franc || francModule;
         } catch (e) {
+            // if the package isn't available or require fails, default to English
             francFunc = () => "eng";
         }
+
         const lang3 = francFunc(text, {
             whitelist: Object.keys(langMap),
             minLength: 10,
         });
         return langMap[lang3] || "en";
     } catch (err) {
+        // on any unexpected error, default to English to keep app stable
         return "en";
     }
 }
@@ -79,6 +91,9 @@ async function translate(text, src, tgt) {
 }
 
 async function summarizeSection(section) {
+    if (!section || section.trim() === '') {
+        return "(No summary returned)";
+    }
     const apiKey = process.env.HUGGING_FACE_API_KEY;
     if (!apiKey) return `(Configuration Error: API Key is Missing)`;
     const maxLength = 3000;
@@ -94,7 +109,6 @@ async function summarizeSection(section) {
             return resp.data[0]?.summary_text?.trim() || "(No summary returned)";
         } catch (err) {
             const status = err.response?.status;
-            // Treat API errors and timeouts as failures for test expectations
             if (status === 503 || status === 504) {
                 retries--; await new Promise((r) => setTimeout(r, 3000));
             } else {
@@ -107,7 +121,8 @@ async function summarizeSection(section) {
 
 function extractJargon(text) {
     const foundTerms = new Set();
-    (text.match(/\b[A-Z][a-zA-Z]{2,}\b/g) || []).forEach((term) => {
+    // require at least 4 characters: initial capital + three letters
+    (text.match(/\b[A-Z][a-zA-Z]{3,}\b/g) || []).forEach((term) => {
         if (!IGNORED_WORDS.has(term) && isNaN(term)) foundTerms.add(term);
     });
     Object.keys(LEGAL_DICTIONARY).forEach((key) => {
@@ -117,14 +132,24 @@ function extractJargon(text) {
 }
 
 async function lookupDefinition(word) {
-    if (LEGAL_DICTIONARY[word]) return LEGAL_DICTIONARY[word];
+    // quick sanity checks
+    if (!word || typeof word !== 'string' || word.trim() === '') {
+        return '(Definition not found)';
+    }
+
+    if (LEGAL_DICTIONARY[word]) {
+        return LEGAL_DICTIONARY[word];
+    }
+
     try {
         const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
         const meanings = resp.data[0]?.meanings;
-        if (!meanings) return null;
-        return meanings[0].definitions[0].definition;
+        if (!meanings || meanings.length === 0) {
+            return '(Definition not found)';
+        }
+        return meanings[0].definitions[0].definition || '(Definition not found)';
     } catch {
-        return null;
+        return '(Definition not found)';
     }
 }
 
