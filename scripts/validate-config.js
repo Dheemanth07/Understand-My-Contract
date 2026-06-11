@@ -1,6 +1,13 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+
+
+
+
 
 const projectRoot = process.cwd();
 
@@ -67,14 +74,14 @@ if (fs.existsSync(tailwindConfigPath)) {
     allValid = false;
   } else {
     tailwindConfig.content.forEach(p => {
-        // Simple check, can be improved with glob
-        if (p.includes('*')) {
-            const dir = p.substring(0, p.indexOf('*'));
-            if (!fs.existsSync(path.join(projectRoot, dir))) {
-                console.error(`Error: Tailwind content path does not exist: ${dir}`);
-                allValid = false;
-            }
+      // Simple check, can be improved with glob
+      if (p.includes('*')) {
+        const dir = p.substring(0, p.indexOf('*'));
+        if (!fs.existsSync(path.join(projectRoot, dir))) {
+          console.error(`Error: Tailwind content path does not exist: ${dir}`);
+          allValid = false;
         }
+      }
     });
   }
 } else {
