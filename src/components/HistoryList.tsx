@@ -8,7 +8,7 @@ import { FileText, Clock } from "lucide-react";
 import { API_BASE_URL } from "@/config";
 
 interface HistoryItem {
-    _id: string;
+    id: string;
     filename: string;
     createdAt: string;
 }
@@ -116,10 +116,9 @@ export default function HistoryList() {
                         <Button
                             variant="outline"
                             size="sm"
-                            key={item._id}
                             onClick={(e) => {
                                 e.stopPropagation(); // prevent card click
-                                navigate(`/history/${item._id}`);
+                                navigate(`/history/${item.id}`);
                             }}
                         >
                             View

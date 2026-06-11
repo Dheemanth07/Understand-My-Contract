@@ -225,7 +225,9 @@ describe('GET /history', () => {
       expect(res2.body[0].filename).toBe('user456-doc.pdf');
     });
   });
-});    it('should not return sensitive data', () => {
+
+  describe('Response Shape', () => {
+    it('should not return sensitive data', () => {
       const mockDoc = {
         id: 'analysis-123',
         filename: 'document.pdf',
