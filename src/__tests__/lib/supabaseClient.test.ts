@@ -20,14 +20,12 @@ describe('supabaseClient', () => {
     it('exports a supabase client instance', () => {
       const { supabase } = require('@/lib/supabaseClient');
       expect(supabase).toBeDefined();
-    }
-  });
+    });
 
     it('client instance has auth property', () => {
       const { supabase } = require('@/lib/supabaseClient');
       expect(supabase.auth).toBeDefined();
-    }
-  });
+    });
 
     it('client instance has from method for database queries', () => {
       const { supabase } = require('@/lib/supabaseClient');

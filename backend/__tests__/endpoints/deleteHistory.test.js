@@ -231,8 +231,8 @@ describe('DELETE /history/:id', () => {
       expect(res2.status).toBe(200);
 
       // Verify both are gone
-      const count = await Analysis.countDocuments({ userId: 'user-123' });
-      // after deleting two documents, count should be 0. if not, log results
+      const count = await Analysis.countDocuments({ _id: { $in: [doc1._id, doc2._id] } });
+      // after deleting these two documents, neither should remain.
       expect(count).toBe(0);
     });
 
