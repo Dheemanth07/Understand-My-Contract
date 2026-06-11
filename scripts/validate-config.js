@@ -5,10 +5,6 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
-
-
-
-
 const projectRoot = process.cwd();
 
 const runCommand = (command, options = {}) => {
@@ -68,16 +64,20 @@ if (!runCommand('eslint --print-config src/main.tsx > /dev/null')) {
 log('Validating Tailwind CSS configuration...');
 const tailwindConfigPath = path.join(projectRoot, 'tailwind.config.ts');
 if (fs.existsSync(tailwindConfigPath)) {
-  const tailwindConfig = require(tailwindConfigPath);
-  if (!tailwindConfig.content || tailwindConfig.content.length === 0) {
-    console.error('Error: tailwind.config.ts `content` array is empty.');
+  // tailwind.config.ts is TypeScript; don't require() it from a Node script.
+  // Instead, do a lightweight static check.
+  const tailwindRaw = fs.readFileSync(tailwindConfigPath, 'utf-8');
+  const contentMatch = tailwindRaw.match(/content\s*:\s*\[([\s\S]*?)\]/m);
+  if (!contentMatch) {
+    console.error('Error: tailwind.config.ts does not include a valid `content` array.');
     allValid = false;
   } else {
-    tailwindConfig.content.forEach(p => {
-      // Simple check, can be improved with glob
+    // If content paths look like relative dirs, verify the base dir exists.
+    const paths = [...tailwindRaw.matchAll(/"(\.[^"]*?)"/g)].map(m => m[1]);
+    paths.forEach(p => {
       if (p.includes('*')) {
         const dir = p.substring(0, p.indexOf('*'));
-        if (!fs.existsSync(path.join(projectRoot, dir))) {
+        if (dir && !fs.existsSync(path.join(projectRoot, dir))) {
           console.error(`Error: Tailwind content path does not exist: ${dir}`);
           allValid = false;
         }
@@ -87,6 +87,7 @@ if (fs.existsSync(tailwindConfigPath)) {
 } else {
   console.warn('Warning: tailwind.config.ts not found. Skipping validation.');
 }
+
 
 // 5. PostCSS Validation
 log('Validating PostCSS configuration...');
