@@ -1,6 +1,3 @@
-// src/config.ts
-const isProduction = import.meta.env.MODE === 'production';
+const backendUrl = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
-export const API_BASE_URL = isProduction 
-  ? "https://document-simplifier.onrender.com"
-  : "http://localhost:5000";
+export const API_BASE_URL = backendUrl.replace(/\/$/, "");

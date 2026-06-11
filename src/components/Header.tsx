@@ -5,10 +5,10 @@ import logo from "@/assets/legal-icon.png";
 
 export default function Header() {
     return (
-        <header class="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-50 flex items-center justify-between px-6">
+        <header className="fixed top-0 left-0 w-full h-20 bg-white shadow-md z-50 flex items-center justify-between px-6">
             {/* Left Side: Your App Name or Logo */}
             <Link to="/" className="flex items-center space-x-3">
-                {/* ⚖️ Logo icon */}
+                {/* Logo icon */}
                 <div className="bg-blue-600 rounded-md">
                     <img
                         src={logo}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
+import { API_BASE_URL } from "@/config";
 
 // Import your feature and UI components
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,6 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from "@/components/Logo";
-
-// This should be in your .env file
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
 // --- Define the data structures for your results ---
 interface SectionResult {
@@ -55,7 +53,7 @@ export default function Dashboard() {
         if (!session?.access_token) return;
         try {
             setLoadingHistory(true);
-            const resp = await axios.get(`${BACKEND_URL}/history`, {
+            const resp = await axios.get(`${API_BASE_URL}/history`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
             });
             setHistory(resp.data);
@@ -93,7 +91,7 @@ export default function Dashboard() {
             formData.append("file", file);
 
             const response = await fetch(
-                `${BACKEND_URL}/upload?lang=${language}`,
+                `${API_BASE_URL}/upload?lang=${language}`,
                 {
                     method: "POST",
                     headers: {
@@ -101,7 +99,7 @@ export default function Dashboard() {
                     },
                     body: formData,
                     signal: abortControllerRef.current.signal, // 2. Attach signal
-                }
+                },
             );
 
             if (!response.ok || !response.body) {
@@ -168,17 +166,17 @@ export default function Dashboard() {
         if (!session?.access_token) return;
         if (
             !window.confirm(
-                "Are you sure you want to permanently delete this item?"
+                "Are you sure you want to permanently delete this item?",
             )
         ) {
             return;
         }
         try {
-            await axios.delete(`${BACKEND_URL}/history/${idToDelete}`, {
+            await axios.delete(`${API_BASE_URL}/history/${idToDelete}`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
             });
             setHistory((prevHistory) =>
-                prevHistory.filter((item) => item.id !== idToDelete)
+                prevHistory.filter((item) => item.id !== idToDelete),
             );
             toast({ title: "Success", description: "History item deleted." });
         } catch (err) {
@@ -240,7 +238,7 @@ export default function Dashboard() {
                                         </p>
                                         <p className="text-xs text-gray-500">
                                             {new Date(
-                                                item.createdAt
+                                                item.createdAt,
                                             ).toLocaleString()}
                                         </p>
                                     </div>
@@ -289,8 +287,10 @@ export default function Dashboard() {
                         />
                     </div>
                     <div className="mb-6">
-                        <Label>Output Language</Label>
+                        <Label htmlFor="output-language">Output Language</Label>
                         <select
+                            id="output-language"
+                            aria-label="Output Language"
                             value={language}
                             onChange={(e) => setLanguage(e.target.value)}
                             className="w-full mt-2 p-2 border rounded-md bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -361,7 +361,7 @@ export default function Dashboard() {
                                                                     term.definition
                                                                 }
                                                             </li>
-                                                        )
+                                                        ),
                                                     )}
                                                 </ul>
                                             </div>

@@ -2,22 +2,10 @@ import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileText, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Upload, FileText, CheckCircle, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-    // This check helps during development to ensure env variables are set.
-    // In a real build, this might not be reachable if variables are missing.
-    console.error(
-        "Supabase URL and Anon Key are missing from environment variables."
-    );
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { API_BASE_URL } from "@/config";
+import { supabase } from "@/lib/supabaseClient";
 
 interface SectionResult {
     section: number;
@@ -116,16 +104,13 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
             const formData = new FormData();
             formData.append("file", file);
 
-            const response = await fetch(
-                "http://localhost:5000/upload?lang=en",
-                {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                    },
-                    body: formData,
-                }
-            );
+            const response = await fetch(`${API_BASE_URL}/upload?lang=en`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: formData,
+            });
 
             if (!response.ok || !response.body) {
                 const errorData = await response
@@ -137,7 +122,7 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
-            let finalResults: SectionResult[] = [];
+            const finalResults: SectionResult[] = [];
             let finalGlossary: Glossary = {};
 
             while (true) {
@@ -167,7 +152,7 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
                         } catch (e) {
                             console.error(
                                 "Failed to parse SSE JSON chunk: ",
-                                line.substring(6)
+                                line.substring(6),
                             );
                         }
                     }
@@ -192,7 +177,7 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
     const viewResults = () => {
         // Scroll to the DocumentComparison section
         const comparisonSection = document.querySelector(
-            "#document-comparison"
+            "#document-comparison",
         );
         if (comparisonSection) {
             comparisonSection.scrollIntoView({ behavior: "smooth" });
@@ -243,6 +228,7 @@ const UploadSection = ({ onProcessComplete }: UploadSectionProps) => {
                             multiple
                             accept=".pdf"
                             onChange={handleFileSelect}
+                            aria-label="Upload PDF files"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         />
 
