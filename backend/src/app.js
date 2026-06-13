@@ -5,11 +5,21 @@ require("dotenv").config();
 const app = express();
 
 const corsOptions = {
-    origin: [
-        "http://localhost:5173",
-        "https://understand-my-contract.vercel.app",
-        "https://www.understand-my-contract.vercel.app",
-    ],
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        const allowedOrigins = [
+            "http://localhost:5173",
+            "http://localhost:8080",
+            "http://localhost:8081",
+            "https://understand-my-contract.vercel.app",
+            "https://www.understand-my-contract.vercel.app"
+        ];
+        if (allowedOrigins.indexOf(origin) !== -1 || /^http:\/\/localhost:\d+$/.test(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -20,8 +30,8 @@ app.options(/^.*$/, cors(corsOptions));
 app.use(express.json());
 
 // Mount routers
-const uploadRouter = require("./routes/upload");
-const historyRouter = require("./routes/history");
+const uploadRouter = require("./features/upload/routes/uploadRoutes");
+const historyRouter = require("./features/history/routes/historyRoutes");
 
 app.use("/upload", uploadRouter);
 app.use("/history", historyRouter);

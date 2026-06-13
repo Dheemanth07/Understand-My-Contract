@@ -7,11 +7,13 @@
 // require-based import). This also makes jest.fn methods work as expected.
 jest.mock('franc-min', () => {
   const fn = jest.fn((text, options) => {
-    // simple heuristic similar to earlier behavior
-    if (text.includes('hello') || text.includes('english')) return 'eng';
-    if (text.includes('namaste') || text.includes('hindi')) return 'hin';
-    if (text.includes('vanakkam') || text.includes('tamil')) return 'tam';
-    if (text.includes('namaskara') || text.includes('kannada')) return 'kan';
+    if (!text) return 'eng';
+    const lower = text.toLowerCase();
+    if (lower.includes('hello') || lower.includes('english')) return 'eng';
+    if (lower.includes('namaste') || lower.includes('hindi') || lower.includes('हिंदी') || lower.includes('नमस्ते')) return 'hin';
+    if (lower.includes('vanakkam') || lower.includes('tamil') || lower.includes('தமிழ்') || lower.includes('வணக்கம்')) return 'tam';
+    if (lower.includes('namaskara') || lower.includes('kannada') || lower.includes('ಕನ್ನಡ') || lower.includes('ಹೆಲೋ')) return 'kan';
+    if (lower.includes('telugu') || lower.includes('తెలుగు') || lower.includes('నమస్కారం')) return 'tel';
     return 'eng';
   });
   return fn;
