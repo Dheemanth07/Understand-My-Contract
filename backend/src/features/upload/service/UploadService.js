@@ -16,7 +16,7 @@ async function handleUpload(req, res) {
     let analysisId = null;
     try {
         const user = await getUserFromToken(req);
-        if (!user) return res.status(401).json({ error: "Invalid token" });
+        if (!user) return res.status(401).json({ error: "Invalid Supabase token" });
         const userId = user.id;
 
         const lang = req.query.lang || "en";

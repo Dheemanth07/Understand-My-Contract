@@ -9,7 +9,7 @@ const { app, Analysis } = require('../../server');
 jest.mock('axios');
 jest.mock('franc-min');
 jest.mock('@xenova/transformers');
-jest.mock('pdf-parse');
+jest.mock('pdf-parse', () => jest.fn());
 jest.mock('mammoth');
 
 // Mock Supabase

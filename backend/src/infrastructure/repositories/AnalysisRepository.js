@@ -26,7 +26,7 @@ async function listUserHistory(userId) {
 }
 
 async function getById(id) {
-    return Analysis.findById(id);
+    return Analysis.findById(id).lean();
 }
 
 async function deleteOne(filter) {
