@@ -1,12 +1,32 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Index from '@/pages/Index';
+import { AuthContextProvider } from '@/context/AuthContext';
+import { mockSupabaseAuth, resetSupabaseMocks } from '@/__tests__/utils/supabaseMock';
+
+// Mock the supabase client module
+jest.mock('@/lib/supabaseClient', () => {
+  const { mockSupabaseAuth } = require('../utils/supabaseMock');
+  return {
+    supabase: {
+      auth: mockSupabaseAuth,
+    },
+    createSupabaseClient: jest.fn(),
+  };
+});
 
 describe('Index page', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetSupabaseMocks();
+  });
+
   it('renders the landing page with header and hero section', () => {
     render(
       <MemoryRouter>
-        <Index />
+        <AuthContextProvider>
+          <Index />
+        </AuthContextProvider>
       </MemoryRouter>
     );
 
@@ -18,7 +38,9 @@ describe('Index page', () => {
   it('displays the page with marketing components', () => {
     render(
       <MemoryRouter>
-        <Index />
+        <AuthContextProvider>
+          <Index />
+        </AuthContextProvider>
       </MemoryRouter>
     );
 
@@ -30,7 +52,9 @@ describe('Index page', () => {
   it('renders without crashing', () => {
     const { container } = render(
       <MemoryRouter>
-        <Index />
+        <AuthContextProvider>
+          <Index />
+        </AuthContextProvider>
       </MemoryRouter>
     );
     expect(container).toBeTruthy();

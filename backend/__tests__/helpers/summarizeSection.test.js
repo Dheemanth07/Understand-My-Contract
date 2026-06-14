@@ -10,6 +10,10 @@ const { summarizeSection } = require('../../server');
 const axios = require('axios');
 const { resetAllMocks, mockAxios } = require('../../testUtils/mocks');
 
+// A reusable long-form text that clears the 15-word short-text bypass guard.
+const LONG_TEXT =
+  'This clause is a sufficiently long piece of legal text that exceeds the minimum word threshold for summarization.';
+
 describe('summarizeSection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -22,14 +26,13 @@ describe('summarizeSection', () => {
 
   describe('Successful Summarization', () => {
     it('should return summary from API', async () => {
-      const text = 'This is a long section of text that needs to be summarized';
+      const text = 'This is a long section of text that needs to be summarized by the backend model';
       const result = await summarizeSection(text);
       expect(result).toBeDefined();
     });
 
     it('should call API with correct URL', async () => {
-      const text = 'Text to summarize';
-      await summarizeSection(text);
+      await summarizeSection(LONG_TEXT);
       expect(axios.post).toHaveBeenCalledWith(
         expect.stringContaining('huggingface.co'),
         expect.any(Object),
@@ -38,8 +41,7 @@ describe('summarizeSection', () => {
     });
 
     it('should include Bearer token in Authorization header', async () => {
-      const text = 'Text to summarize';
-      await summarizeSection(text);
+      await summarizeSection(LONG_TEXT);
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(Object),
@@ -52,8 +54,7 @@ describe('summarizeSection', () => {
     });
 
     it('should set timeout to 600000ms', async () => {
-      const text = 'Text to summarize';
-      await summarizeSection(text);
+      await summarizeSection(LONG_TEXT);
       expect(axios.post).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(Object),
@@ -64,7 +65,7 @@ describe('summarizeSection', () => {
     });
 
     it('should extract and trim summary text', async () => {
-      const text = 'Long text to be summarized here';
+      const text = 'Long legal clause text to be summarized by the AI model for the user';
       const result = await summarizeSection(text);
       // Result should be trimmed summary
       expect(result).toBeDefined();
@@ -72,16 +73,33 @@ describe('summarizeSection', () => {
     });
   });
 
+  describe('Short-text bypass guard', () => {
+    it('should return original text unchanged when input is fewer than 15 words', async () => {
+      const shortText = 'Short input text';
+      const result = await summarizeSection(shortText);
+      // API must NOT be called for short text
+      expect(axios.post).not.toHaveBeenCalled();
+      expect(result).toBe(shortText.trim());
+    });
+
+    it('should call the API for input with exactly 15+ words', async () => {
+      const fifteenWordText =
+        'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen words';
+      await summarizeSection(fifteenWordText);
+      expect(axios.post).toHaveBeenCalled();
+    });
+  });
+
   describe('Missing API Key', () => {
     it('should return error message when API key missing', async () => {
       delete process.env.HUGGING_FACE_API_KEY;
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(Configuration Error: API Key is Missing)');
     });
 
     it('should not call API when key is missing', async () => {
       delete process.env.HUGGING_FACE_API_KEY;
-      await summarizeSection('Some text');
+      await summarizeSection(LONG_TEXT);
       expect(mockAxios.post).not.toHaveBeenCalled();
     });
   });
@@ -92,7 +110,7 @@ describe('summarizeSection', () => {
         throw new Error('API Error');
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(Failed to summarize)');
     });
 
@@ -103,7 +121,7 @@ describe('summarizeSection', () => {
         throw error;
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(Failed to summarize)');
     });
 
@@ -114,7 +132,7 @@ describe('summarizeSection', () => {
         throw error;
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(Failed to summarize)');
     });
 
@@ -125,7 +143,7 @@ describe('summarizeSection', () => {
         throw error;
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(Failed to summarize)');
     });
   });
@@ -136,7 +154,7 @@ describe('summarizeSection', () => {
         return { data: [{ summary_text: '' }] };
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(No summary returned)');
     });
 
@@ -145,7 +163,7 @@ describe('summarizeSection', () => {
         return { data: [{}] };
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('(No summary returned)');
     });
 
@@ -154,7 +172,7 @@ describe('summarizeSection', () => {
         return { data: [{ summary_text: '  Summary with spaces  ' }] };
       });
 
-      const result = await summarizeSection('Some text');
+      const result = await summarizeSection(LONG_TEXT);
       expect(result).toBe('Summary with spaces');
     });
   });
@@ -172,13 +190,14 @@ describe('summarizeSection', () => {
     });
 
     it('should handle text with special characters', async () => {
-      const text = 'Text with @#$% special !@#$% chars';
+      const text = 'Text with @#$% special legal chars that form a long enough clause to trigger summarization model';
       const result = await summarizeSection(text);
       expect(result).toBeDefined();
     });
 
     it('should handle text with non-English content', async () => {
-      const text = 'नमस्ते विश्व'; // Hindi text
+      // Hindi text long enough to exceed the 15-word guard (words split by spaces)
+      const text = 'यह एक लंबा हिंदी पाठ है जो अनुबंध की शर्तों को समझाने के लिए लिखा गया है।';
       const result = await summarizeSection(text);
       expect(result).toBeDefined();
     });

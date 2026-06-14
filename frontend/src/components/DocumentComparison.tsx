@@ -1,6 +1,7 @@
+// src/components/DocumentComparison.tsx
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText } from "lucide-react";
+import { FileText, Sparkles, AlertCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface SectionResult {
@@ -14,7 +15,6 @@ interface Glossary {
     [key: string]: string;
 }
 
-// 👇 THIS IS THE DATA YOU WERE MISSING
 const mockDocument = {
     title: "Software License Agreement",
     sections: [
@@ -82,14 +82,11 @@ const DocumentComparison = ({
     glossary = {},
     isDemo = false,
 }: DocumentComparisonProps) => {
-    // 1. LOGIC: Determine what to show
     let displayData: any[] = [];
 
     if (results.length > 0) {
-        // Case A: We have real results (Dashboard)
         displayData = results;
     } else if (isDemo) {
-        // Case B: We are on Landing Page (Show Mock Data)
         displayData = mockDocument.sections.map((section) => ({
             section: section.id,
             original: section.original,
@@ -97,7 +94,6 @@ const DocumentComparison = ({
             legalTerms: section.legalTerms,
         }));
     } else {
-        // Case C: Dashboard is empty (User hasn't uploaded yet) -> RENDER NOTHING
         return null;
     }
 
@@ -105,6 +101,9 @@ const DocumentComparison = ({
         originalText: string,
         sectionTerms: { term: string; definition: string }[]
     ) => {
+        if (!sectionTerms || sectionTerms.length === 0) {
+            return <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{originalText}</p>;
+        }
         const sortedTerms = [...sectionTerms].sort(
             (a, b) => b.term.length - a.term.length
         );
@@ -113,61 +112,62 @@ const DocumentComparison = ({
             const regex = new RegExp(`\\b(${term})\\b`, "gi");
             textWithTooltips = textWithTooltips.replace(
                 regex,
-                `<span class="font-bold text-blue-600 cursor-pointer underline decoration-dotted decoration-blue-400" title="${definition}">$1</span>`
+                `<span class="font-semibold text-blue-700 cursor-pointer underline decoration-dotted decoration-blue-500/60 hover:bg-blue-50 px-0.5 rounded transition-colors" title="${definition}">$1</span>`
             );
         });
         return (
             <div
-                className="text-gray-700 leading-relaxed"
+                className="text-slate-700 text-sm leading-relaxed"
                 dangerouslySetInnerHTML={{ __html: textWithTooltips }}
             />
         );
     };
 
     return (
-        <section id="document-comparison" className="py-20 bg-white">
+        <section id="see-in-action" className="py-16 bg-slate-50 border-t border-slate-200/60">
             <div className="max-w-7xl mx-auto px-6">
-                <div className="text-center mb-12">
-                    <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                        {isDemo ? "See It In Action" : "Analysis Results"}
+                <div className="text-center mb-8">
+                    <h2 className="text-2xl md:text-4xl font-extrabold text-slate-900 mb-3">
+                        {isDemo ? "See It In Action" : "Clause Analysis Results"}
                     </h2>
-                    <p className="text-xl text-gray-600">
+                    <p className="text-sm md:text-base text-slate-500 max-w-2xl mx-auto">
                         {isDemo
-                            ? "This is an example of how we simplify complex legal agreements."
-                            : "Here is the simplified breakdown of your uploaded document."}
+                            ? "Explore this side-by-side example comparing raw legalese with our simple translation."
+                            : "Your analyzed clauses are organized in parallel panels for clean viewing."}
                     </p>
                 </div>
 
-                <div className="flex justify-center gap-6 mb-8 text-sm text-gray-500">
-                    <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 bg-blue-600 rounded-full"></span>
-                        <span>Hover over blue text for definitions</span>
+                <div className="flex justify-center gap-6 mb-8 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 bg-white px-3.5 py-2 rounded-lg border border-slate-200/80 shadow-sm">
+                        <AlertCircle className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Hover over highlighted terms to view instant definitions</span>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                     {/* Original Document Column */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4 px-2">
-                            <h3 className="text-2xl font-semibold text-gray-800">
+                    <div className="flex flex-col">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-slate-400" />
                                 Original Legal Text
                             </h3>
-                            <Badge variant="outline">Complex</Badge>
+                            <Badge variant="outline" className="border-slate-350 border-slate-300 text-slate-500 text-[10px] rounded-md font-medium">Complex</Badge>
                         </div>
-                        <Card className="p-6 bg-gray-50 border-l-4 border-gray-300 shadow-sm h-[600px] overflow-y-auto">
-                            <div className="space-y-8">
+                        <Card className="bg-white border border-slate-200/80 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
+                            <div className="space-y-6">
                                 <TooltipProvider>
                                     {displayData.map((result) => (
                                         <div
                                             key={`original-${result.section}`}
-                                            className="p-4 bg-white rounded-lg shadow-sm border border-gray-100"
+                                            className="p-4 bg-slate-50/50 rounded-lg border border-slate-200/60"
                                         >
-                                            <h4 className="font-bold text-gray-400 text-sm uppercase tracking-wider mb-3">
+                                            <h4 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-2">
                                                 Section {result.section}
                                             </h4>
                                             {renderOriginalWithTooltips(
                                                 result.original,
-                                                result.legalTerms
+                                                result.legalTerms || []
                                             )}
                                         </div>
                                     ))}
@@ -177,28 +177,29 @@ const DocumentComparison = ({
                     </div>
 
                     {/* Simplified Document Column */}
-                    <div>
-                        <div className="flex items-center justify-between mb-4 px-2">
-                            <h3 className="text-2xl font-semibold text-blue-600">
-                                Simplified Summary
+                    <div className="flex flex-col">
+                        <div className="flex items-center justify-between mb-3 px-1">
+                            <h3 className="text-sm font-bold text-blue-700 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-blue-600" />
+                                Simplified Translation
                             </h3>
-                            <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+                            <Badge className="bg-blue-50 border border-blue-100 text-blue-800 text-[10px] hover:bg-blue-50 rounded-md font-medium">
                                 Plain English
                             </Badge>
                         </div>
-                        <Card className="p-6 bg-blue-50/50 border-l-4 border-blue-500 shadow-sm h-[600px] overflow-y-auto">
-                            <div className="space-y-8">
+                        <Card className="bg-white border border-blue-200/50 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto bg-blue-50/10">
+                            <div className="space-y-6">
                                 {displayData.map((result) => (
                                     <div
                                         key={`summary-${result.section}`}
-                                        className="p-4 bg-white rounded-lg shadow-sm border border-blue-100"
+                                        className="p-4 bg-blue-50/30 rounded-lg border border-blue-100/50"
                                     >
-                                        <h4 className="font-bold text-blue-400 text-sm uppercase tracking-wider mb-3">
+                                        <h4 className="font-bold text-blue-700/80 text-xs uppercase tracking-wider mb-2">
                                             Section {result.section}
                                         </h4>
-                                        <div className="flex gap-3">
-                                            <FileText className="w-5 h-5 text-blue-500 flex-shrink-0 mt-1" />
-                                            <p className="text-gray-800 leading-relaxed">
+                                        <div className="flex gap-2.5">
+                                            <FileText className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                                            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
                                                 {result.summary}
                                             </p>
                                         </div>

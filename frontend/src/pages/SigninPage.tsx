@@ -1,5 +1,5 @@
 // src/pages/SigninPage.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,15 @@ export default function SigninPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const { signIn } = UserAuth();
+    const { signIn, session } = UserAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
+
+    useEffect(() => {
+        if (session) {
+            navigate("/dashboard", { replace: true });
+        }
+    }, [session, navigate]);
 
     const handleSignin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -37,63 +43,61 @@ export default function SigninPage() {
     };
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-            <Card className="p-8 w-full max-w-sm">
+        <div className="flex items-center justify-center min-h-screen bg-slate-50 px-6 py-12">
+            <Card className="bg-white border border-slate-200/80 shadow-sm p-8 w-full max-w-sm rounded-lg">
                 <div className="flex justify-center mb-6">
                     <Logo />
                 </div>
-                <h1 className="text-2xl font-semibold text-center mb-2">
+                <h1 className="text-xl font-bold text-center text-slate-900 mb-2">
                     Log in to your account
                 </h1>
-                <p className="text-center text-sm text-gray-600 mb-6">
+                <p className="text-center text-xs text-slate-500 mb-6">
                     Don't have an account?{" "}
                     <Link
                         to="/signup"
-                        className="font-medium text-indigo-600 hover:underline"
+                        className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
                         Sign Up
                     </Link>
                 </p>
 
-                {/* --- GOOGLE BUTTON ADDED HERE --- */}
                 <GoogleSignInButton>Sign in with Google</GoogleSignInButton>
 
-                <div className="relative my-4">
+                <div className="relative my-5">
                     <div className="absolute inset-0 flex items-center">
-                        <span className="w-full border-t" />
+                        <span className="w-full border-t border-slate-200" />
                     </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                        <span className="bg-white px-2 text-muted-foreground">
+                    <div className="relative flex justify-center text-[10px] uppercase tracking-wider font-semibold">
+                        <span className="bg-white px-2.5 text-slate-400">
                             Or with email and password
                         </span>
                     </div>
                 </div>
-                {/* --- END OF ADDED SECTION --- */}
 
-                <form onSubmit={handleSignin}>
-                    <div className="mb-4">
-                        <label htmlFor="email" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Email Address</label>
+                <form onSubmit={handleSignin} className="space-y-4">
+                    <div className="space-y-1">
+                        <label htmlFor="email" className="text-xs font-semibold text-slate-700">Email Address</label>
                         <Input
                             id="email"
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             required
-                            className="mt-1"
+                            className="bg-white border-slate-250 border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-900 rounded-md h-10 mt-1"
                         />
                     </div>
-                    <div className="mb-6">
-                        <label htmlFor="password" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Password</label>
+                    <div className="space-y-1">
+                        <label htmlFor="password" className="text-xs font-semibold text-slate-700">Password</label>
                         <Input
                             id="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             required
-                            className="mt-1"
+                            className="bg-white border-slate-250 border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-900 rounded-md h-10 mt-1"
                         />
                     </div>
-                    <Button type="submit" className="w-full" disabled={loading}>
+                    <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-all h-10 mt-2 rounded-md shadow-sm" disabled={loading}>
                         {loading ? "Signing In..." : "Sign In"}
                     </Button>
                 </form>

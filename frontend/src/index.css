@@ -2,134 +2,118 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
     :root {
-        --background: 220 23% 97%;
-        --foreground: 222 84% 5%;
+        --background: 210 40% 98%;
+        --foreground: 222 47% 11%;
 
         --card: 0 0% 100%;
-        --card-foreground: 222 84% 5%;
+        --card-foreground: 222 47% 11%;
 
         --popover: 0 0% 100%;
-        --popover-foreground: 222 84% 5%;
+        --popover-foreground: 222 47% 11%;
 
-        --primary: 221 83% 53%;
+        --primary: 221 83% 45%;
         --primary-foreground: 210 40% 98%;
-        --primary-hover: 221 83% 48%;
+        --primary-hover: 221 83% 38%;
 
-        --secondary: 210 40% 96%;
-        --secondary-foreground: 222 47% 11%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
 
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
 
-        --accent: 217 91% 60%;
-        --accent-foreground: 222 84% 5%;
+        --accent: 210 40% 96.1%;
+        --accent-foreground: 222.2 47.4% 11.2%;
 
-        --destructive: 0 84% 60%;
+        --destructive: 0 84.2% 60.2%;
         --destructive-foreground: 210 40% 98%;
 
-        --border: 214 32% 91%;
-        --input: 214 32% 91%;
-        --ring: 221 83% 53%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 221.2 83.2% 53.3%;
 
-        --legal-primary: 221 83% 53%;
-        --legal-secondary: 217 91% 60%;
-        --legal-dark: 222 84% 5%;
-        --legal-light: 210 40% 98%;
-        --legal-muted: 215 16% 47%;
+        --legal-primary: 221 83% 45%;
+        --legal-secondary: 215 16% 47%;
+        --legal-dark: 222 47% 11%;
+        --legal-light: 0 0% 100%;
+        --legal-muted: 215.4 16.3% 46.9%;
 
-        --gradient-hero: linear-gradient(
-            135deg,
-            hsl(var(--legal-primary)),
-            hsl(var(--legal-secondary))
-        );
-        --gradient-card: linear-gradient(
-            180deg,
-            hsl(0 0% 100%),
-            hsl(210 40% 98%)
-        );
-        --gradient-accent: linear-gradient(
-            90deg,
-            hsl(var(--legal-primary) / 0.1),
-            hsl(var(--legal-secondary) / 0.1)
-        );
+        --gradient-hero: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --gradient-card: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        --gradient-accent: linear-gradient(90deg, rgba(29, 78, 216, 0.04) 0%, rgba(29, 78, 216, 0.02) 100%);
 
-        --shadow-soft: 0 4px 20px hsl(var(--legal-primary) / 0.1);
-        --shadow-medium: 0 8px 32px hsl(var(--legal-primary) / 0.15);
-        --shadow-strong: 0 16px 48px hsl(var(--legal-primary) / 0.2);
+        --shadow-soft: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+        --shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+        --shadow-strong: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
 
-        --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        --transition-bounce: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        --transition-smooth: all 0.15s ease-in-out;
+        --transition-bounce: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.1);
 
-        --radius: 0.75rem;
+        --radius: 0.5rem;
 
-        --sidebar-background: 0 0% 98%;
-
-        --sidebar-foreground: 240 5.3% 26.1%;
-
-        --sidebar-primary: 240 5.9% 10%;
-
-        --sidebar-primary-foreground: 0 0% 98%;
-
-        --sidebar-accent: 240 4.8% 95.9%;
-
-        --sidebar-accent-foreground: 240 5.9% 10%;
-
-        --sidebar-border: 220 13% 91%;
-
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --sidebar-background: 210 40% 96.1%;
+        --sidebar-foreground: 222 47% 11%;
+        --sidebar-primary: 221 83% 45%;
+        --sidebar-primary-foreground: 210 40% 98%;
+        --sidebar-accent: 210 40% 93%;
+        --sidebar-accent-foreground: 222 47% 11%;
+        --sidebar-border: 214.3 31.8% 91.4%;
+        --sidebar-ring: 221.2 83.2% 53.3%;
     }
 
     .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
-
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
-
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
-
-        --primary: 210 40% 98%;
-        --primary-foreground: 222.2 47.4% 11.2%;
-
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
-
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
-
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
-
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
-
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 212.7 26.8% 83.9%;
-        --sidebar-background: 240 5.9% 10%;
-        --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 224.3 76.3% 48%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 3.7% 15.9%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 3.7% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        /* Override dark variables to fallback to light mode style to preserve default colors */
+        --background: 210 40% 98%;
+        --foreground: 222 47% 11%;
+        --card: 0 0% 100%;
+        --card-foreground: 222 47% 11%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 221.2 83.2% 53.3%;
+        --primary: 221 83% 45%;
+        --primary-foreground: 210 40% 98%;
     }
 }
 
 @layer base {
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground antialiased selection:bg-blue-500/20 selection:text-slate-900;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     }
 
     .legal-term {
-        @apply bg-yellow-200 px-1 rounded cursor-pointer transition-all hover:bg-yellow-300;
+        @apply bg-amber-100/70 text-amber-900 px-1 py-0.5 rounded cursor-pointer transition-all hover:bg-amber-200/70 border-b border-amber-400/40 font-medium;
     }
+}
+
+/* Corporate UI Utility Classes */
+.corporate-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+.corporate-card-hover {
+    transition: all 0.15s ease-in-out;
+}
+.corporate-card-hover:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Scrollbar customization */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.02);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
 }
