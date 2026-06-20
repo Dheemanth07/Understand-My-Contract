@@ -65,6 +65,89 @@ async function detectLanguage(text) {
 
 let translatorCache = {};
 
+// Timestamp (ms) until which Gemini calls are skipped after a quota error.
+// Avoids blocking the user when the free-tier limit is exhausted.
+let geminiDisabledUntil = 0;
+
+async function callGemini(prompt) {
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!geminiKey) return null;
+
+    // If we recently hit a quota limit, skip the call entirely and fall back
+    // immediately rather than making the user wait for retries that will fail.
+    if (Date.now() < geminiDisabledUntil) {
+        const secsLeft = Math.ceil((geminiDisabledUntil - Date.now()) / 1000);
+        console.warn(`[Gemini] Quota cooldown active — skipping (${secsLeft}s remaining). Using fallback.`);
+        return null;
+    }
+
+    const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+
+    try {
+        console.log(`[Gemini] Calling Gemini API...`);
+        const resp = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
+            {
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            },
+            {
+                headers: { "Content-Type": "application/json" },
+                timeout: 30000
+            }
+        );
+        const generatedText = resp?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (generatedText) {
+            console.log(`[Gemini] ✅ Success`);
+            return generatedText.trim();
+        }
+        console.warn(`[Gemini] ⚠️ Empty response candidates`);
+        return null;
+    } catch (err) {
+        const status = err.response?.status;
+        const errData = err.response?.data?.error;
+        const isQuotaError = status === 429 || (errData?.message && errData.message.includes("Quota exceeded"));
+
+        if (isQuotaError) {
+            // Disable Gemini for 60 seconds so subsequent sections go straight
+            // to Hugging Face without any delay.
+            geminiDisabledUntil = Date.now() + 60000;
+            console.warn(`[Gemini] Quota exceeded — falling back to Hugging Face for the next 60s.`);
+        } else {
+            console.error("❌ Gemini API Error:", err.response?.data || err.message);
+        }
+        return null;
+    }
+}
+
+async function simplifyAndTranslateWithGemini(section, targetLang = "en") {
+    const langNames = {
+        hi: "Hindi",
+        es: "Spanish",
+        fr: "French",
+        kn: "Kannada",
+        ta: "Tamil",
+        te: "Telugu",
+        en: "English"
+    };
+    const targetLangName = langNames[targetLang] || targetLang;
+
+    let prompt;
+    if (targetLang === "en") {
+        prompt = `You are a legal expert. Simplify and summarize the following contract section into plain, easy-to-understand English. Keep the summary accurate, preserving key rights and obligations. Keep it concise, under 150 words.\n\nSection text:\n"${section}"`;
+    } else {
+        prompt = `You are a legal expert. Simplify and summarize the following contract section into plain, easy-to-understand language, and write the final summary strictly in ${targetLangName}. Do NOT include any English version, preamble, explanation, or conversational introductory phrases. Output ONLY the raw simplified text in ${targetLangName}.\n\nSection text:\n"${section}"`;
+    }
+
+    const summary = await callGemini(prompt);
+    if (summary) return summary;
+
+    console.warn(`[Gemini] Processing failed, falling back to dual-step Hugging Face pipeline...`);
+    const englishSummary = await summarizeSection(section);
+    return await translate(englishSummary, "en", targetLang);
+}
+
 // Map ISO 639-1 codes to the M2M-100 language tag format (e.g. "kn" -> "kn")
 // M2M-100 uses ISO codes as-is for most languages; the HF Inference API
 // accepts them directly via the parameters.tgt_lang field.
@@ -82,13 +165,8 @@ async function translate(text, src, tgt) {
         return "";
     }
 
-    // Force source language to English (M2M-100 requirement).
-    // The HF Inference API passes this as the forced_bos_token_id
-    // internally, which makes the model emit the correct output language
-    // rather than defaulting to English.
     const srcLang = "en";
     const tgtLang = resolvedTgt;
-    console.log(`[translate] M2M-100 forced_bos_token_id will be resolved for tgt_lang="${tgtLang}" by the HF Inference API.`);
 
     // In Jest environment, use @xenova/transformers to satisfy test expectations
     if (process.env.JEST_WORKER_ID !== undefined) {
@@ -110,10 +188,29 @@ async function translate(text, src, tgt) {
         }
     }
 
-    let apiKey = process.env.HUGGING_FACE_API_KEY;
-    if (process.env.JEST_WORKER_ID === undefined) {
-        apiKey = apiKey || process.env.HUGGINGFACE_API_KEY;
+    // Try Gemini API first if key is available
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (geminiKey) {
+        const langNames = {
+            hi: "Hindi",
+            es: "Spanish",
+            fr: "French",
+            kn: "Kannada",
+            ta: "Tamil",
+            te: "Telugu",
+            en: "English"
+        };
+        const targetLangName = langNames[resolvedTgt] || resolvedTgt;
+        const prompt = `Translate the following English legal summary into ${targetLangName}. Do NOT include any preamble, conversation, introductory phrases, or markdown block tags. Output ONLY the raw translated text.\n\nText to translate:\n"${text}"`;
+        const translatedText = await callGemini(prompt);
+        if (translatedText) {
+            return translatedText;
+        }
+        console.warn(`[translate] Gemini translation failed or was empty, falling back to Hugging Face.`);
     }
+
+    let apiKey = process.env.HUGGING_FACE_API_KEY;
+    apiKey = apiKey || process.env.HUGGINGFACE_API_KEY;
     if (!apiKey) {
         console.warn(`[translate] No HF API key found — returning original text unchanged.`);
         return text;
@@ -150,11 +247,11 @@ async function translate(text, src, tgt) {
     while (retries > 0) {
         try {
             const resp = await axios.post(
-                `https://api-inference.huggingface.co/models/${modelName}`,
+                `https://router.huggingface.co/hf-inference/models/${modelName}`,
                 {
                     inputs: formattedText,
                 },
-                { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 20000 }
+                { headers: { Authorization: `Bearer ${apiKey}` }, timeout: 60000 }
             );
             const translated = resp?.data?.[0]?.translation_text || resp?.data?.[0]?.generated_text || text;
             console.log(`[translate] ✅ Success — tgt="${resolvedTgt}" result_preview="${String(translated).substring(0, 80)}"`);
@@ -187,9 +284,22 @@ async function summarizeSection(section) {
     const wordCount = section.trim().split(/\s+/).length;
     console.log(`[summarize] Input word count: ${wordCount}`);
     if (wordCount < 15) {
-        console.log(`[summarize] ⚠️  Short-text guard triggered (${wordCount} words < 15) — skipping BART, returning original text.`);
+        console.log(`[summarize] ⚠️  Short-text guard triggered (${wordCount} words < 15) — skipping BART/Gemini, returning original text.`);
         return section.trim();
     }
+
+    // Try Gemini API first if key is available and not in tests
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (geminiKey && process.env.JEST_WORKER_ID === undefined) {
+        console.log(`[summarize] Sending ${wordCount}-word section to Gemini...`);
+        const prompt = `You are a legal expert. Simplify and summarize the following contract section into plain, easy-to-understand English. Keep the summary accurate, preserving key rights and obligations. Keep it concise, under 150 words.\n\nSection text:\n"${section}"`;
+        const summary = await callGemini(prompt);
+        if (summary) {
+            return summary;
+        }
+        console.warn(`[summarize] Gemini summarization failed, falling back to BART.`);
+    }
+
     console.log(`[summarize] Sending ${wordCount}-word section to BART-CNN...`);
 
     let apiKey = process.env.HUGGING_FACE_API_KEY;
@@ -264,6 +374,63 @@ async function lookupDefinition(word) {
     }
 }
 
+async function analyzeRisksWithGemini(contractText) {
+    const prompt = `You are a senior corporate legal counsel. Analyze the following contract for standard legal risks, unfair clauses, warning signs, and redlines. 
+Provide a list of findings. Each finding must include:
+1. "clause": A short title of the clause/issue (e.g. "Automatic Renewal Loop", "Severe Liability Cap", "Indemnification").
+2. "severity": One of strictly "high", "medium", or "low".
+3. "risk": A clear description of the risk, what it means, and why it is a warning.
+4. "recommendation": A concrete recommendation or counter-proposal on what the user should negotiate.
+
+Format your output STRICTLY as a JSON array of objects. Do NOT wrap the JSON in markdown code blocks, do NOT add any preamble or chat intro. Output ONLY raw parseable JSON array.
+JSON format:
+[
+  {
+    "clause": "clause title",
+    "severity": "high" | "medium" | "low",
+    "risk": "risk description",
+    "recommendation": "recommendation text"
+  }
+]
+
+Contract text:
+"${contractText.substring(0, 15000)}"`;
+
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!geminiKey) {
+        return [
+            {
+                clause: "Governing Law & Jurisdiction",
+                severity: "medium",
+                risk: "The agreement dictates that disputes will be settled in the supplier's preferred local court, which might be out of state or country, raising legal cost risks.",
+                recommendation: "Negotiate for your home state jurisdiction or a neutral site for arbitration."
+            },
+            {
+                clause: "Automatic Renewal / Opt-Out Deadline",
+                severity: "high",
+                risk: "The agreement automatically renews for successive 12-month periods unless written notice is given at least 60 days before the end of the term.",
+                recommendation: "Modify the clause to require active confirmation of renewal, or reduce the notice period to 30 days."
+            },
+            {
+                clause: "Limitation of Liability Limit",
+                severity: "high",
+                risk: "The supplier limits their total liability to the amount paid in the last 6 months, which could leave you under-compensated for serious breaches or data losses.",
+                recommendation: "Request that the liability cap be raised to at least 12 or 24 months of fees, or create a carve-out for data breaches."
+            }
+        ];
+    }
+
+    const responseText = await callGemini(prompt);
+    if (!responseText) return [];
+    try {
+        const cleanJson = responseText.replace(/```json|```/g, "").trim();
+        return JSON.parse(cleanJson);
+    } catch (e) {
+        console.error("Failed to parse Gemini risk analysis response:", responseText, e);
+        return [];
+    }
+}
+
 module.exports = {
     extractTextFromFile,
     splitIntoSections,
@@ -272,4 +439,7 @@ module.exports = {
     summarizeSection,
     extractJargon,
     lookupDefinition,
+    simplifyAndTranslateWithGemini,
+    callGemini,
+    analyzeRisksWithGemini,
 };

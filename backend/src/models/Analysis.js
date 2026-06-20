@@ -16,6 +16,15 @@ const AnalysisSchema = new mongoose.Schema(
             },
         ],
         glossary: { type: Object, default: {} },
+        risks: [
+            {
+                clause: String,
+                severity: String,
+                risk: String,
+                recommendation: String,
+            },
+        ],
+        lastActiveAt: { type: Date, default: Date.now },
     },
     { timestamps: true }
 );

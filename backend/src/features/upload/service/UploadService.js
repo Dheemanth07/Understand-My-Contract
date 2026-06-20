@@ -7,13 +7,85 @@ const {
     summarizeSection,
     extractJargon,
     lookupDefinition,
+    simplifyAndTranslateWithGemini,
+    analyzeRisksWithGemini,
 } = require("../../../shared/ai/processing");
 
 const AnalysisRepository = require("../../../infrastructure/repositories/AnalysisRepository");
 const { getUserFromToken } = require("../../../utils/auth");
 
+async function processContractInBackground(analysisId, text, lang) {
+    try {
+        const sections = splitIntoSections(text);
+        let mainGlossary = {};
+
+        for (let i = 0; i < sections.length; i++) {
+            // Heartbeat check: Query latest document state
+            const doc = await AnalysisRepository.getById(analysisId);
+            if (!doc) {
+                console.warn(`[UploadService] Document not found for heartbeat: ${analysisId}. Aborting.`);
+                return;
+            }
+            if (doc.status === "failed") {
+                console.warn(`[UploadService] Job marked as failed: ${analysisId}. Aborting.`);
+                return;
+            }
+
+            const timeSinceActive = Date.now() - new Date(doc.lastActiveAt).getTime();
+            if (timeSinceActive > 30000) {
+                console.warn(`[UploadService] Client heartbeat timed out (${timeSinceActive}ms). Setting to failed.`);
+                await AnalysisRepository.setFailed(analysisId);
+                return;
+            }
+
+            const sectionText = sections[i];
+            let targetLangSummary;
+
+            const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+            if (geminiKey && process.env.JEST_WORKER_ID === undefined) {
+                targetLangSummary = await simplifyAndTranslateWithGemini(sectionText, lang);
+            } else {
+                const englishSummary = await summarizeSection(sectionText);
+                targetLangSummary = await translate(englishSummary, "en", lang);
+            }
+
+            const terms = extractJargon(sectionText);
+            let sectionTerms = [];
+            for (const term of terms) {
+                if (!mainGlossary[term]) {
+                    const def = await lookupDefinition(term);
+                    if (def) mainGlossary[term] = def;
+                    if (!def && !Object.prototype.hasOwnProperty.call(mainGlossary, term)) {
+                        mainGlossary[term] = null;
+                    }
+                }
+
+                if (mainGlossary[term]) {
+                    sectionTerms.push({ term, definition: mainGlossary[term] });
+                }
+            }
+
+            const sectionData = {
+                original: sectionText,
+                summary: targetLangSummary,
+                legalTerms: sectionTerms,
+            };
+
+            await AnalysisRepository.pushSection(analysisId, sectionData);
+        }
+
+        // Analyze legal risks/redlines using Gemini
+        const risks = await analyzeRisksWithGemini(text);
+
+        await AnalysisRepository.setCompleted(analysisId, mainGlossary, risks);
+        console.log(`[UploadService] Background processing completed for: ${analysisId}`);
+    } catch (err) {
+        console.error(`[UploadService] Background processing failed:`, err);
+        await AnalysisRepository.setFailed(analysisId);
+    }
+}
+
 async function handleUpload(req, res) {
-    let analysisId = null;
     try {
         const user = await getUserFromToken(req);
         if (!user) return res.status(401).json({ error: "Invalid Supabase token" });
@@ -36,71 +108,25 @@ async function handleUpload(req, res) {
             outputLang: lang,
             sections: [],
             glossary: {},
-        });
-        analysisId = newAnalysis._id;
-
-        const sections = splitIntoSections(text);
-
-        let isRequestCancelled = false;
-        req.on("close", () => {
-            isRequestCancelled = true;
+            risks: [],
+            lastActiveAt: new Date(),
         });
 
-        res.setHeader("Content-Type", "text/event-stream");
-        res.flushHeaders();
-        res.write(
-            `data: ${JSON.stringify({ totalSections: sections.length, analysisId })}\n\n`
-        );
+        // Respond to client immediately with 200 OK and the analysis ID
+        res.status(200).json({
+            analysisId: newAnalysis._id,
+            status: "processing",
+        });
 
-        let mainGlossary = {};
+        // Start background contract analysis
+        processContractInBackground(newAnalysis._id, text, lang).catch((err) => {
+            console.error("[UploadService] Uncaught background process error:", err);
+        });
 
-        for (let i = 0; i < sections.length; i++) {
-            if (isRequestCancelled) break;
-
-            const sectionText = sections[i];
-            const englishSummary = await summarizeSection(sectionText);
-            const targetLangSummary = await translate(englishSummary, "en", lang);
-
-            const terms = extractJargon(sectionText);
-            let sectionTerms = [];
-            for (const term of terms) {
-                if (!mainGlossary[term]) {
-                    const def = await lookupDefinition(term);
-                    if (def) mainGlossary[term] = def;
-                    if (!def && !Object.prototype.hasOwnProperty.call(mainGlossary, term)) {
-                        mainGlossary[term] = null;
-                    }
-                    if (!Object.prototype.hasOwnProperty.call(LEGAL_DICTIONARY, term)) {
-                        await new Promise((r) => setTimeout(r, 100));
-                    }
-                }
-
-                if (mainGlossary[term]) sectionTerms.push({ term, definition: mainGlossary[term] });
-            }
-
-            const sectionData = {
-                original: sectionText,
-                summary: targetLangSummary,
-                legalTerms: sectionTerms,
-            };
-
-            await AnalysisRepository.pushSection(analysisId, sectionData);
-            res.write(
-                `data: ${JSON.stringify({ section: i + 1, ...sectionData })}\n\n`
-            );
-        }
-
-        await AnalysisRepository.setCompleted(analysisId, mainGlossary);
-        res.write(`data: {"done": true}\n\n`);
-        res.end();
     } catch (err) {
-        if (analysisId) {
-            await AnalysisRepository.setFailed(analysisId);
-        }
+        console.error(`[UploadService] Upload handling failed: ${err.message}`);
         if (!res.headersSent) {
-            res.status(500).json({ error: "Processing failed" });
-        } else {
-            res.end();
+            res.status(500).json({ error: "Upload failed" });
         }
     }
 }

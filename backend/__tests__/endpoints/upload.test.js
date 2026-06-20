@@ -65,10 +65,11 @@ describe('POST /upload', () => {
         .set('Authorization', 'Bearer valid-token')
         .attach('file', Buffer.from('Test content'), 'test.txt');
 
-      // Should return 200 with SSE stream or 400/500 on processing error
+      // Should return 200 with JSON or 400/500 on processing error
       expect([200, 400, 500]).toContain(res.status);
       if (res.status === 200) {
-        expect(res.headers['content-type']).toContain('text/event-stream');
+        expect(res.headers['content-type']).toContain('application/json');
+        expect(res.body.analysisId).toBeDefined();
       }
     });
   });
@@ -100,17 +101,17 @@ describe('POST /upload', () => {
       expect([400, 500]).toContain(res.status);
     });
   });
-});  describe('Successful Upload with SSE Response', () => {
-    it('should return SSE stream with Content-Type header', async () => {
+});  describe('Successful Upload with JSON Response', () => {
+    it('should return JSON with Content-Type header', async () => {
       const res = await request(app)
         .post('/upload')
         .set('Authorization', 'Bearer valid-token')
         .attach('file', Buffer.from('Test content for analysis'), 'test.txt');
 
       if (res.status === 200) {
-        expect(res.headers['content-type']).toContain('text/event-stream');
-        expect(res.text).toContain('totalSections');
-        expect(res.text).toContain('analysisId');
+        expect(res.headers['content-type']).toContain('application/json');
+        expect(res.body.analysisId).toBeDefined();
+        expect(res.body.status).toBe('processing');
       }
     });
 
@@ -128,14 +129,14 @@ describe('POST /upload', () => {
       }
     });
 
-    it('should include analysisId in SSE response', async () => {
+    it('should include analysisId in JSON response', async () => {
       const res = await request(app)
         .post('/upload')
         .set('Authorization', 'Bearer valid-token')
         .attach('file', Buffer.from('Test content'), 'test.txt');
 
       if (res.status === 200) {
-        expect(res.text).toMatch(/"analysisId":"[a-f0-9]+"/);
+        expect(res.body.analysisId).toBeDefined();
       }
     });
   });
