@@ -9,6 +9,7 @@ import Dashboard from "./routes/Dashboard";
 import PrivateRoute from "./components/PrivateRoute";
 import HistoryView from "./pages/HistoryView";
 import HistoryList from "./components/HistoryList";
+import GlossaryPage from "./pages/GlossaryPage";
 import NotFound from "./pages/NotFound";
 
 export const router = createBrowserRouter([
@@ -36,6 +37,14 @@ export const router = createBrowserRouter([
         element: (
             <PrivateRoute>
                 <HistoryView />
+            </PrivateRoute>
+        ),
+    },
+    {
+        path: "/glossary",
+        element: (
+            <PrivateRoute>
+                <GlossaryPage />
             </PrivateRoute>
         ),
     },
