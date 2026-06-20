@@ -1,13 +1,14 @@
-// src/components/HistoryList.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Clock, ChevronRight } from "lucide-react";
+import { FileText, Clock, ChevronRight, ChevronLeft, LayoutDashboard } from "lucide-react";
 import { API_BASE_URL } from "@/config";
-import Header from "./Header";
+import Logo from "@/components/Logo";
 import Footer from "./Footer";
+
+const PAGE_SIZE = 5;
 
 interface HistoryItem {
     id: string;
@@ -16,41 +17,68 @@ interface HistoryItem {
 }
 
 export default function HistoryList() {
-    const [history, setHistory] = useState<HistoryItem[]>([]);
+    const [items, setItems] = useState<HistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [hasMore, setHasMore] = useState(false);
+
+    // cursorHistory[0] is always null (first page).
+    // cursorHistory[n] is the nextCursor returned after fetching page n-1.
+    const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
+    const [pageIndex, setPageIndex] = useState(0);
+
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const fetchHistory = async () => {
-            try {
-                const { data } = await supabase.auth.getSession();
-                const token = data.session?.access_token;
-
-                if (!token) {
-                    setError("You must be logged in to view history.");
-                    return;
-                }
-
-                const response = await fetch(`${API_BASE_URL}/history`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) throw new Error("Failed to fetch history");
-
-                const dataJson = await response.json();
-                setHistory(dataJson);
-            } catch (err: any) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
+    const fetchPage = useCallback(async (cursor: string | null) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const { data } = await supabase.auth.getSession();
+            const token = data.session?.access_token;
+            if (!token) {
+                setError("You must be logged in to view history.");
+                return;
             }
-        };
 
-        fetchHistory();
-    }, []);
+            const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+            if (cursor) params.set("cursor", cursor);
+
+            const response = await fetch(`${API_BASE_URL}/history?${params}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error("Failed to fetch history");
+
+            const json = await response.json();
+            setItems(json.items);
+            setHasMore(json.hasMore);
+
+            // Store the cursor returned so "Next" can use it
+            if (json.nextCursor) {
+                setCursorHistory((prev) => {
+                    const next = [...prev];
+                    // Only append if it's not already recorded
+                    if (!next[pageIndex + 1]) next[pageIndex + 1] = json.nextCursor;
+                    return next;
+                });
+            }
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [pageIndex]);
+
+    useEffect(() => {
+        fetchPage(cursorHistory[pageIndex]);
+    }, [pageIndex]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const goNext = () => {
+        setPageIndex((p) => p + 1);
+    };
+
+    const goPrev = () => {
+        setPageIndex((p) => p - 1);
+    };
 
     const renderContent = () => {
         if (loading) {
@@ -67,21 +95,20 @@ export default function HistoryList() {
         if (error) {
             return (
                 <div className="text-center text-rose-600 py-16 bg-white border border-slate-200 rounded-lg shadow-sm">
-                    {error || "Something went wrong while fetching history."}
+                    {error}
                 </div>
             );
         }
 
-        if (history.length === 0) {
+        if (items.length === 0 && pageIndex === 0) {
             return (
                 <div className="text-center py-16 bg-white border border-dashed border-slate-200 rounded-lg space-y-3 shadow-sm">
-                    <p className="text-slate-600 font-semibold text-sm">
-                        No previous documents found.
-                    </p>
-                    <p className="text-xs text-slate-400">
-                        Upload your first document to get started.
-                    </p>
-                    <Button onClick={() => navigate("/dashboard")} className="bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 text-xs shadow-sm">
+                    <p className="text-slate-600 font-semibold text-sm">No previous documents found.</p>
+                    <p className="text-xs text-slate-400">Upload your first document to get started.</p>
+                    <Button
+                        onClick={() => navigate("/dashboard")}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-md h-9 text-xs shadow-sm"
+                    >
                         Go to Dashboard
                     </Button>
                 </div>
@@ -90,7 +117,7 @@ export default function HistoryList() {
 
         return (
             <div className="grid gap-3.5">
-                {history.map((item) => (
+                {items.map((item) => (
                     <Card
                         key={item.id}
                         className="p-4 flex justify-between items-center bg-white border border-slate-200 hover:border-slate-350 hover:shadow-md transition cursor-pointer rounded-lg group shadow-sm"
@@ -136,12 +163,56 @@ export default function HistoryList() {
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-700 font-sans flex flex-col justify-between">
-            <Header />
+            {/* Authenticated top bar — no Sign In / Get Started */}
+            <header className="fixed top-0 left-0 w-full h-16 bg-white border-b border-slate-200/80 z-50 flex items-center">
+                <div className="max-w-7xl mx-auto w-full h-full flex items-center justify-between px-6">
+                    <Logo />
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate("/dashboard")}
+                        className="gap-1.5 text-xs h-8 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm font-semibold"
+                    >
+                        <LayoutDashboard className="w-3.5 h-3.5" />
+                        Dashboard
+                    </Button>
+                </div>
+            </header>
             <main className="flex-1 max-w-3xl w-full mx-auto px-6 pt-24 pb-16 space-y-6">
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    Your Document History
-                </h2>
+                <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight">Your Document History</h2>
+                    {!loading && (pageIndex > 0 || hasMore) && (
+                        <span className="text-xs text-slate-400 font-medium">Page {pageIndex + 1}</span>
+                    )}
+                </div>
+
                 {renderContent()}
+
+                {/* Pagination controls */}
+                {!loading && !error && (pageIndex > 0 || hasMore) && (
+                    <div className="flex items-center justify-between pt-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={pageIndex === 0}
+                            onClick={goPrev}
+                            className="gap-1.5 text-xs h-8 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 shadow-sm"
+                        >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            Previous
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!hasMore}
+                            onClick={goNext}
+                            className="gap-1.5 text-xs h-8 border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 shadow-sm"
+                        >
+                            Next
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        </Button>
+                    </div>
+                )}
             </main>
             <Footer />
         </div>
