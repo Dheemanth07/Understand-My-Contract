@@ -12,5 +12,19 @@ async function deleteHandler(req, res) {
     return HistoryService.deleteById(req, res);
 }
 
-module.exports = { listHandler, getByIdHandler, deleteHandler };
+async function chatHandler(req, res) {
+    return HistoryService.chat(req, res);
+}
+
+async function getMergedGlossaryHandler(req, res) {
+    return HistoryService.getMergedGlossary(req, res);
+}
+
+module.exports = {
+    listHandler,
+    getByIdHandler,
+    deleteHandler,
+    chatHandler,
+    getMergedGlossaryHandler,
+};
 
