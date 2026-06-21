@@ -1,5 +1,3 @@
-import { ReadableStream } from 'web-streams-polyfill/ponyfill';
-
 export const mockBackendURL = 'http://localhost:5000';
 
 export const createSSEChunk = (data: any) => `data: ${JSON.stringify(data)}\n\n`;
