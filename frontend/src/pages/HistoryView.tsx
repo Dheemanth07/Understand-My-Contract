@@ -11,6 +11,7 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
+import { formatMarkdownToHtml } from "@/lib/utils";
 
 export default function HistoryView() {
     const { id } = useParams();
@@ -553,9 +554,10 @@ export default function HistoryView() {
                                         {/* Simplified Column Card */}
                                         <div className="space-y-2 bg-blue-50/60 border border-blue-200 p-4 rounded-md shadow-sm">
                                             <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Simplified Summary:</p>
-                                            <p className="text-slate-850 text-xs leading-relaxed whitespace-pre-line">
-                                                {section.summary}
-                                            </p>
+                                            <div 
+                                                className="text-slate-800 text-xs leading-relaxed whitespace-pre-line"
+                                                dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(section.summary) }}
+                                            />
                                         </div>
                                     </div>
 

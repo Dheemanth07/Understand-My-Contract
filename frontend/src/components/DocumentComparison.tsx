@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Sparkles, AlertCircle } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { formatMarkdownToHtml } from "@/lib/utils";
 
 interface SectionResult {
     section: number;
@@ -157,14 +158,14 @@ const DocumentComparison = ({
                         <Card className="bg-slate-50 border border-slate-200 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
                             <div className="space-y-4">
                                 <TooltipProvider>
-                                    {displayData.map((result) => (
+                                    {displayData.map((result, idx) => (
                                         <div
-                                            key={`original-${result.section}`}
+                                            key={`original-${result.section || idx}`}
                                             className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm"
                                         >
                                             <h4 className="font-bold text-slate-500 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
                                                 <span className="w-1 h-3.5 rounded-full bg-slate-400 inline-block" />
-                                                Section {result.section}
+                                                Section {result.section || idx + 1}
                                             </h4>
                                             {renderOriginalWithTooltips(
                                                 result.original,
@@ -190,20 +191,21 @@ const DocumentComparison = ({
                         </div>
                         <Card className="bg-blue-50/60 border border-blue-200 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
                             <div className="space-y-4">
-                                {displayData.map((result) => (
+                                {displayData.map((result, idx) => (
                                     <div
-                                        key={`summary-${result.section}`}
+                                        key={`summary-${result.section || idx}`}
                                         className="p-4 bg-white rounded-lg border border-blue-200 shadow-sm"
                                     >
                                         <h4 className="font-bold text-blue-700 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
                                             <span className="w-1 h-3.5 rounded-full bg-blue-500 inline-block" />
-                                            Section {result.section}
+                                            Section {result.section || idx + 1}
                                         </h4>
                                         <div className="flex gap-2.5">
-                                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                                            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
-                                                {result.summary}
-                                            </p>
+                                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0 mt-1" />
+                                            <div 
+                                                className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap flex-1"
+                                                dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(result.summary) }}
+                                            />
                                         </div>
                                     </div>
                                 ))}

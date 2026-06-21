@@ -4,6 +4,7 @@ import { UserAuth } from "../context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import { API_BASE_URL } from "@/config";
+import { formatMarkdownToHtml } from "@/lib/utils";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -944,7 +945,7 @@ export default function Dashboard() {
                                     <div key={index} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg">
                                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                             <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
-                                            Section {result.section}
+                                            Section {result.section || index + 1}
                                         </h3>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -959,9 +960,10 @@ export default function Dashboard() {
                                             {/* Simplified Clause Card */}
                                             <Card className="bg-blue-50/60 border border-blue-200 p-4 shadow-sm rounded-md">
                                                 <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">Simplified Summary</p>
-                                                <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap">
-                                                    {result.summary}
-                                                </p>
+                                                <div 
+                                                    className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap"
+                                                    dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(result.summary) }}
+                                                />
                                             </Card>
                                         </div>
 
