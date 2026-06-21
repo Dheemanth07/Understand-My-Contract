@@ -19,7 +19,7 @@
     "test:e2e:debug": "dotenv -e .env.test -- playwright test --debug",
     "test:e2e:report": "playwright show-report",
     "test:e2e:codegen": "playwright codegen",
-    "validate:config": "node ../scripts/validate-config.js",
+    "validate:config": "node ../scripts/validate-config.mjs",
     "validate:env": "node ../scripts/validate-env.cjs",
     "validate:env:dev": "node ../scripts/validate-env.cjs --env dev",
     "validate:env:test": "node ../scripts/validate-env.cjs --env test",
