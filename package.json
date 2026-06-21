@@ -11,7 +11,15 @@
     "test:backend": "npm test --prefix backend",
     "test:frontend": "npm test --prefix frontend",
     "typecheck:frontend": "npm run typecheck --prefix frontend",
-    "build:frontend": "npm run build --prefix frontend"
+    "build:frontend": "npm run build --prefix frontend",
+    "validate:config": "npm run validate:config --prefix frontend",
+    "validate:env": "npm run validate:env --prefix frontend --",
+    "test:build": "npm run test:build --prefix frontend",
+    "lint": "npm run lint --prefix frontend",
+    "typecheck": "npm run typecheck --prefix frontend",
+    "test:ci": "npm run test:ci --prefix frontend",
+    "test:e2e": "npm run test:e2e --prefix frontend --",
+    "build": "npm run build --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

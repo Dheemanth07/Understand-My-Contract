@@ -42,8 +42,8 @@ if (fs.existsSync(viteConfigPath) && fs.existsSync(tsConfigPath)) {
   const viteConfigContent = fs.readFileSync(viteConfigPath, 'utf-8');
   const tsConfigContent = fs.readFileSync(tsConfigPath, 'utf-8');
 
-  // A bit simplistic, but good enough for this project's convention.
-  const viteAlias = /@\/\*":\s*".\/src\/\*/.test(viteConfigContent);
+  // Verify that vite config resolving alias maps '@' to './src'
+  const viteAlias = /"@":\s*path\.resolve/.test(viteConfigContent);
   const tsAlias = /"@\/\*":\s*\["\.\/src\/\*"/.test(tsConfigContent.replace(/\s/g, ''));
 
   if (!viteAlias || !tsAlias) {
@@ -56,7 +56,7 @@ if (fs.existsSync(viteConfigPath) && fs.existsSync(tsConfigPath)) {
 
 // 3. ESLint Configuration Check
 log('Validating ESLint configuration...');
-if (!runCommand('eslint --print-config src/main.tsx > /dev/null')) {
+if (!runCommand('eslint --print-config src/main.tsx', { stdio: 'ignore' })) {
   allValid = false;
 }
 
