@@ -101,9 +101,32 @@ export default function GlossaryPage() {
 
                 {/* --- GLOSSARY DISPLAY --- */}
                 {loading ? (
-                    <div className="py-20 text-center flex flex-col items-center justify-center gap-3">
-                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-slate-400 text-xs animate-pulse">Loading terms...</p>
+                    <div className="space-y-8">
+                        {/* Simulate 2 letter groups with 4 skeleton cards each */}
+                        {[...Array(2)].map((_, groupIdx) => (
+                            <div key={groupIdx} className="space-y-3">
+                                {/* Letter badge skeleton */}
+                                <div className="flex items-center gap-3">
+                                    <div className="w-7 h-7 rounded-full bg-blue-100 animate-pulse" />
+                                    <div className="h-px bg-slate-200 flex-1" />
+                                </div>
+                                {/* Card grid skeleton */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[...Array(4)].map((_, cardIdx) => (
+                                        <div key={cardIdx} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm space-y-2">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-3.5 h-3.5 rounded bg-blue-100 animate-pulse shrink-0" />
+                                                <div className="h-3.5 bg-slate-200 rounded animate-pulse w-1/3" />
+                                            </div>
+                                            <div className="space-y-1 pl-5">
+                                                <div className="h-3 bg-slate-200 rounded animate-pulse w-full" />
+                                                <div className="h-3 bg-slate-200 rounded animate-pulse w-5/6" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 ) : Object.keys(glossary).length === 0 ? (
                     <Card className="p-8 text-center bg-white border border-slate-200 shadow-sm rounded-lg">

@@ -59,6 +59,7 @@ export default function Dashboard() {
     const abortControllerRef = useRef<AbortController | null>(null);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isExportingPDF, setIsExportingPDF] = useState(false);
 
     const checkScrollPosition = useCallback(() => {
         const docHeight = document.documentElement.scrollHeight;
@@ -279,6 +280,7 @@ export default function Dashboard() {
         }
 
         try {
+            setIsExportingPDF(true);
             toast({
                 title: "Exporting PDF",
                 description: "Generating high-quality document report...",
@@ -465,6 +467,8 @@ export default function Dashboard() {
                 description: "Could not export PDF report.",
                 variant: "destructive",
             });
+        } finally {
+            setIsExportingPDF(false);
         }
     };
 
@@ -638,8 +642,16 @@ export default function Dashboard() {
                     {/* Scrollable list container */}
                     <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
                         {loadingHistory ? (
-                            <div className="py-4 text-center text-xs text-slate-400 animate-pulse">
-                                Loading history...
+                            <div className="space-y-2">
+                                {[...Array(4)].map((_, i) => (
+                                    <div key={i} className="p-3 bg-white border border-slate-200 rounded-lg flex items-center gap-2.5 shadow-sm">
+                                        <div className="w-4 h-4 rounded bg-slate-200 animate-pulse shrink-0" />
+                                        <div className="flex-1 space-y-1.5">
+                                            <div className="h-3 bg-slate-200 rounded animate-pulse w-3/4" />
+                                            <div className="h-2.5 bg-slate-200 rounded animate-pulse w-1/2" />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ) : history.length > 0 ? (
                             history.map((item) => (
@@ -710,9 +722,19 @@ export default function Dashboard() {
                                     variant="outline"
                                     className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
                                     onClick={handleExportPDF}
+                                    disabled={isExportingPDF}
                                 >
-                                    <Download className="w-3.5 h-3.5 text-emerald-600" />
-                                    Export PDF
+                                    {isExportingPDF ? (
+                                        <>
+                                            <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                                            Exporting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download className="w-3.5 h-3.5 text-emerald-600" />
+                                            Export PDF
+                                        </>
+                                    )}
                                 </Button>
                             )}
                             <Button
