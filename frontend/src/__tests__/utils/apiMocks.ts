@@ -60,7 +60,7 @@ export const mockFetchSSE = (chunks: string[], delay = 0) => {
   // Create a ReadableStream from chunks
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
-    start(controller) {
+    start(controller: any) {
       (async () => {
         for (const chunk of chunks) {
           controller.enqueue(encoder.encode(chunk));
