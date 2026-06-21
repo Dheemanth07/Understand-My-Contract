@@ -268,6 +268,12 @@ export default function Dashboard() {
         sessionStorage.removeItem("uploading");
         setUploading(false);
         setActiveAnalysisId(null);
+        setAnalysisResults([]);
+        setRisks([]);
+        setFile(null);
+        setActiveDocumentName("");
+        setChatMessages([]);
+        fetchHistory();
     };
 
     const handleExportPDF = async () => {
