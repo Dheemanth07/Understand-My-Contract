@@ -7,6 +7,7 @@ const app = express();
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
+        
         const allowedOrigins = [
             "http://localhost:5173",
             "http://localhost:8080",
@@ -14,7 +15,15 @@ const corsOptions = {
             "https://understand-my-contract.vercel.app",
             "https://www.understand-my-contract.vercel.app"
         ];
-        if (allowedOrigins.indexOf(origin) !== -1 || /^http:\/\/localhost:\d+$/.test(origin)) {
+        
+        if (process.env.FRONTEND_URL) {
+            allowedOrigins.push(process.env.FRONTEND_URL);
+        }
+        
+        const isVercelPreview = /\.vercel\.app$/.test(origin);
+        const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || isLocalhost || isVercelPreview) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
