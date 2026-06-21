@@ -319,11 +319,62 @@ export default function Dashboard() {
                         reportContent.style.setProperty("max-width", "1024px", "important");
                         reportContent.style.setProperty("min-width", "1024px", "important");
                         reportContent.style.setProperty("margin", "0 auto", "important");
-                        reportContent.style.setProperty("padding", "24px", "important");
+                        reportContent.style.setProperty("padding", "32px", "important");
                         reportContent.style.setProperty("box-sizing", "border-box", "important");
                     }
 
-                    // Convert all CSS Grid elements to robust flex/block elements with explicit widths
+                    // ── Fix truncation: remove overflow/clip/ellipsis on ALL elements ──
+                    clonedDoc.querySelectorAll("*").forEach((el) => {
+                        const htmlEl = el as HTMLElement;
+                        if (
+                            htmlEl.classList.contains("truncate") ||
+                            htmlEl.classList.contains("overflow-hidden") ||
+                            htmlEl.classList.contains("min-w-0")
+                        ) {
+                            htmlEl.style.setProperty("overflow", "visible", "important");
+                            htmlEl.style.setProperty("text-overflow", "clip", "important");
+                            htmlEl.style.setProperty("white-space", "normal", "important");
+                        }
+                    });
+
+                    // ── Generous spacing on header ──
+                    const header = clonedDoc.querySelector("header");
+                    if (header) {
+                        (header as HTMLElement).style.setProperty("padding-bottom", "28px", "important");
+                        (header as HTMLElement).style.setProperty("margin-bottom", "12px", "important");
+                        (header as HTMLElement).style.setProperty("display", "block", "important");
+                    }
+                    // Make the h2 report title wrap freely
+                    clonedDoc.querySelectorAll("h2").forEach((h) => {
+                        (h as HTMLElement).style.setProperty("white-space", "normal", "important");
+                        (h as HTMLElement).style.setProperty("overflow", "visible", "important");
+                        (h as HTMLElement).style.setProperty("text-overflow", "clip", "important");
+                        (h as HTMLElement).style.setProperty("word-break", "break-word", "important");
+                        (h as HTMLElement).style.setProperty("margin-bottom", "6px", "important");
+                    });
+
+                    // ── Card content: generous padding on all cards ──
+                    clonedDoc.querySelectorAll(".p-4").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "20px", "important");
+                    });
+                    clonedDoc.querySelectorAll(".p-5").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "22px", "important");
+                    });
+                    clonedDoc.querySelectorAll(".p-3").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "16px", "important");
+                    });
+
+                    // ── Add vertical breathing room between section result cards ──
+                    clonedDoc.querySelectorAll("[class*='space-y-4'], [class*='space-y-6']").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("row-gap", "24px", "important");
+                    });
+
+                    // ── Individual result/info cards: add margin between them ──
+                    clonedDoc.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
+                        (card as HTMLElement).style.setProperty("margin-bottom", "20px", "important");
+                    });
+
+                    // ── Convert all CSS Grid elements to robust flex/block elements ──
                     const grids = clonedDoc.querySelectorAll(".grid");
                     grids.forEach((grid) => {
                         const el = grid as HTMLElement;
@@ -338,9 +389,10 @@ export default function Dashboard() {
                         el.style.setProperty("display", "flex", "important");
                         el.style.setProperty("flex-direction", "row", "important");
                         el.style.setProperty("flex-wrap", "nowrap", "important");
-                        el.style.setProperty("gap", "16px", "important");
+                        el.style.setProperty("gap", "20px", "important");
                         el.style.setProperty("width", "100%", "important");
                         el.style.setProperty("box-sizing", "border-box", "important");
+                        el.style.setProperty("margin-bottom", "20px", "important");
 
                         const children = Array.from(el.children);
                         if (cols > 1 && children.length > 0) {
@@ -352,6 +404,8 @@ export default function Dashboard() {
                                 childEl.style.setProperty("flex", "1 1 0%", "important");
                                 childEl.style.setProperty("box-sizing", "border-box", "important");
                                 childEl.style.setProperty("display", "block", "important");
+                                childEl.style.setProperty("overflow", "visible", "important");
+                                childEl.style.setProperty("min-width", "0", "important");
                             });
                         } else {
                             el.style.setProperty("flex-direction", "column", "important");
@@ -361,6 +415,7 @@ export default function Dashboard() {
                                 childEl.style.setProperty("max-width", "100%", "important");
                                 childEl.style.setProperty("box-sizing", "border-box", "important");
                                 childEl.style.setProperty("display", "block", "important");
+                                childEl.style.setProperty("overflow", "visible", "important");
                             });
                         }
                     });

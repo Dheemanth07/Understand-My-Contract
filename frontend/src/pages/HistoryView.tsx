@@ -79,11 +79,73 @@ export default function HistoryView() {
                         reportContent.style.setProperty("max-width", "1024px", "important");
                         reportContent.style.setProperty("min-width", "1024px", "important");
                         reportContent.style.setProperty("margin", "0 auto", "important");
-                        reportContent.style.setProperty("padding", "24px", "important");
+                        reportContent.style.setProperty("padding", "32px", "important");
                         reportContent.style.setProperty("box-sizing", "border-box", "important");
                     }
 
-                    // Convert all CSS Grid elements to robust flex/block elements with explicit widths
+                    // ── Fix truncation: remove any overflow/clip/ellipsis on ALL elements ──
+                    clonedDoc.querySelectorAll("*").forEach((el) => {
+                        const htmlEl = el as HTMLElement;
+                        if (
+                            htmlEl.classList.contains("truncate") ||
+                            htmlEl.classList.contains("overflow-hidden") ||
+                            htmlEl.classList.contains("min-w-0")
+                        ) {
+                            htmlEl.style.setProperty("overflow", "visible", "important");
+                            htmlEl.style.setProperty("text-overflow", "clip", "important");
+                            htmlEl.style.setProperty("white-space", "normal", "important");
+                        }
+                    });
+
+                    // ── Generous spacing on header ──
+                    const header = clonedDoc.querySelector("header");
+                    if (header) {
+                        (header as HTMLElement).style.setProperty("padding-bottom", "28px", "important");
+                        (header as HTMLElement).style.setProperty("margin-bottom", "12px", "important");
+                        (header as HTMLElement).style.setProperty("display", "block", "important");
+                    }
+                    // Make the title wrap freely and show in full
+                    const h1 = clonedDoc.querySelector("header h1");
+                    if (h1) {
+                        (h1 as HTMLElement).style.setProperty("white-space", "normal", "important");
+                        (h1 as HTMLElement).style.setProperty("overflow", "visible", "important");
+                        (h1 as HTMLElement).style.setProperty("text-overflow", "clip", "important");
+                        (h1 as HTMLElement).style.setProperty("font-size", "22px", "important");
+                        (h1 as HTMLElement).style.setProperty("margin-bottom", "8px", "important");
+                        (h1 as HTMLElement).style.setProperty("line-height", "1.4", "important");
+                        (h1 as HTMLElement).style.setProperty("word-break", "break-word", "important");
+                    }
+
+                    // ── Ensure the header text container fills width ──
+                    const headerTitleBlock = clonedDoc.querySelector("header .space-y-1\\.5, header .space-y-1, header > div:first-child");
+                    if (headerTitleBlock) {
+                        (headerTitleBlock as HTMLElement).style.setProperty("max-width", "100%", "important");
+                        (headerTitleBlock as HTMLElement).style.setProperty("width", "100%", "important");
+                    }
+
+                    // ── Card content: generous padding on all cards ──
+                    clonedDoc.querySelectorAll(".p-4").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "20px", "important");
+                    });
+                    clonedDoc.querySelectorAll(".p-5").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "22px", "important");
+                    });
+                    clonedDoc.querySelectorAll(".p-3").forEach((el) => {
+                        (el as HTMLElement).style.setProperty("padding", "16px", "important");
+                    });
+
+                    // ── Add vertical breathing room between sections ──
+                    clonedDoc.querySelectorAll("section").forEach((sec) => {
+                        (sec as HTMLElement).style.setProperty("margin-bottom", "32px", "important");
+                        (sec as HTMLElement).style.setProperty("padding-top", "8px", "important");
+                    });
+
+                    // ── Individual result/info cards: add margin between them ──
+                    clonedDoc.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
+                        (card as HTMLElement).style.setProperty("margin-bottom", "20px", "important");
+                    });
+
+                    // ── Convert all CSS Grid elements to robust flex/block elements ──
                     const grids = clonedDoc.querySelectorAll(".grid");
                     grids.forEach((grid) => {
                         const el = grid as HTMLElement;
@@ -98,9 +160,10 @@ export default function HistoryView() {
                         el.style.setProperty("display", "flex", "important");
                         el.style.setProperty("flex-direction", "row", "important");
                         el.style.setProperty("flex-wrap", "nowrap", "important");
-                        el.style.setProperty("gap", "16px", "important");
+                        el.style.setProperty("gap", "20px", "important");
                         el.style.setProperty("width", "100%", "important");
                         el.style.setProperty("box-sizing", "border-box", "important");
+                        el.style.setProperty("margin-bottom", "20px", "important");
 
                         const children = Array.from(el.children);
                         if (cols > 1 && children.length > 0) {
