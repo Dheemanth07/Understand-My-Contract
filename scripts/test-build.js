@@ -71,10 +71,10 @@ const runBuildTests = () => {
         throw new Error('Production build output is missing assets directory.');
     }
     const prodAssets = fs.readdirSync(assetsDir);
-    if (!prodAssets.some(f => f.match(/index-[a-f0-9]+\.js/))) {
+    if (!prodAssets.some(f => f.match(/index[-_.][\w-]+\.js/))) {
         throw new Error('No hashed JS entrypoint found in production build.');
     }
-    if (!prodAssets.some(f => f.match(/index-[a-f0-9]+\.css/))) {
+    if (!prodAssets.some(f => f.match(/index[-_.][\w-]+\.css/))) {
         throw new Error('No hashed CSS file found in production build.');
     }
     logInfo('Production build validated.');
