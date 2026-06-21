@@ -535,14 +535,15 @@ export default function HistoryView() {
 
                         <div className="space-y-4">
                             {docData.sections.map((section: any, idx: number) => (
-                                <Card key={idx} className="bg-white border border-slate-200/80 p-5 shadow-sm rounded-lg space-y-4">
-                                    <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider">
+                                <Card key={idx} className="bg-white border border-slate-200 p-5 shadow-sm rounded-lg space-y-4">
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                        <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
                                         Section {idx + 1}
                                     </h3>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Original Column Card */}
-                                        <div className="space-y-1 bg-slate-50/50 border border-slate-200/60 p-4 rounded-md">
+                                        <div className="space-y-2 bg-slate-50 border border-slate-200 p-4 rounded-md shadow-sm">
                                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Original Text:</p>
                                             <p className="text-slate-700 text-xs leading-relaxed whitespace-pre-line">
                                                 {section.original}
@@ -550,9 +551,9 @@ export default function HistoryView() {
                                         </div>
 
                                         {/* Simplified Column Card */}
-                                        <div className="space-y-1 bg-blue-50/5 border border-blue-100/50 p-4 rounded-md">
-                                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Simplified Summary:</p>
-                                            <p className="text-slate-800 text-xs leading-relaxed whitespace-pre-line">
+                                        <div className="space-y-2 bg-blue-50/60 border border-blue-200 p-4 rounded-md shadow-sm">
+                                            <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Simplified Summary:</p>
+                                            <p className="text-slate-850 text-xs leading-relaxed whitespace-pre-line">
                                                 {section.summary}
                                             </p>
                                         </div>

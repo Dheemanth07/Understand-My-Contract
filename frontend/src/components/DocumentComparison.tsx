@@ -152,17 +152,18 @@ const DocumentComparison = ({
                                 <FileText className="w-4 h-4 text-slate-400" />
                                 Original Legal Text
                             </h3>
-                            <Badge variant="outline" className="border-slate-350 border-slate-300 text-slate-500 text-[10px] rounded-md font-medium">Complex</Badge>
+                            <Badge variant="outline" className="border-slate-300 text-slate-500 text-[10px] rounded-md font-medium">Complex</Badge>
                         </div>
-                        <Card className="bg-white border border-slate-200/80 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
-                            <div className="space-y-6">
+                        <Card className="bg-slate-50 border border-slate-200 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
+                            <div className="space-y-4">
                                 <TooltipProvider>
                                     {displayData.map((result) => (
                                         <div
                                             key={`original-${result.section}`}
-                                            className="p-4 bg-slate-50/50 rounded-lg border border-slate-200/60"
+                                            className="p-4 bg-white rounded-lg border border-slate-200 shadow-sm"
                                         >
-                                            <h4 className="font-bold text-slate-400 text-xs uppercase tracking-wider mb-2">
+                                            <h4 className="font-bold text-slate-500 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <span className="w-1 h-3.5 rounded-full bg-slate-400 inline-block" />
                                                 Section {result.section}
                                             </h4>
                                             {renderOriginalWithTooltips(
@@ -187,18 +188,19 @@ const DocumentComparison = ({
                                 Plain English
                             </Badge>
                         </div>
-                        <Card className="bg-white border border-blue-200/50 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto bg-blue-50/10">
-                            <div className="space-y-6">
+                        <Card className="bg-blue-50/60 border border-blue-200 p-5 shadow-sm rounded-lg flex-1 h-[450px] overflow-y-auto">
+                            <div className="space-y-4">
                                 {displayData.map((result) => (
                                     <div
                                         key={`summary-${result.section}`}
-                                        className="p-4 bg-blue-50/30 rounded-lg border border-blue-100/50"
+                                        className="p-4 bg-white rounded-lg border border-blue-200 shadow-sm"
                                     >
-                                        <h4 className="font-bold text-blue-700/80 text-xs uppercase tracking-wider mb-2">
+                                        <h4 className="font-bold text-blue-700 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+                                            <span className="w-1 h-3.5 rounded-full bg-blue-500 inline-block" />
                                             Section {result.section}
                                         </h4>
                                         <div className="flex gap-2.5">
-                                            <FileText className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                                            <FileText className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                                             <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
                                                 {result.summary}
                                             </p>

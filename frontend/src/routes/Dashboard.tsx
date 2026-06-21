@@ -941,14 +941,15 @@ export default function Dashboard() {
 
                             <div className="space-y-4 animate-fade-in">
                                 {analysisResults.map((result, index) => (
-                                    <div key={index} className="space-y-3 bg-white p-5 border border-slate-200/80 shadow-sm rounded-lg">
-                                        <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider">
+                                    <div key={index} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg">
+                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                            <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
                                             Section {result.section}
                                         </h3>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {/* Original Clause Card */}
-                                            <Card className="bg-slate-50/50 border border-slate-200/80 p-4 shadow-sm rounded-md">
+                                            <Card className="bg-slate-50 border border-slate-200 p-4 shadow-sm rounded-md">
                                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Original Text</p>
                                                 <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
                                                     {result.original}
@@ -956,9 +957,9 @@ export default function Dashboard() {
                                             </Card>
 
                                             {/* Simplified Clause Card */}
-                                            <Card className="bg-blue-50/5 border border-blue-200/50 p-4 shadow-sm rounded-md">
-                                                <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-2">Simplified Summary</p>
-                                                <p className="text-xs text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                            <Card className="bg-blue-50/60 border border-blue-200 p-4 shadow-sm rounded-md">
+                                                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">Simplified Summary</p>
+                                                <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap">
                                                     {result.summary}
                                                 </p>
                                             </Card>
