@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { TextEncoder, TextDecoder } from 'util';
-global.TextEncoder = TextEncoder;
+(global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
 // Set up environment variables for tests
