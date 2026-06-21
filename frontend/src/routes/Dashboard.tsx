@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ToastAction } from "@/components/ui/toast";
 import Logo from "@/components/Logo";
 import { Clock, FileText, Trash2, LogOut, UploadCloud, Globe, AlertCircle, Sparkles, ChevronRight, MessageSquare, Send, X, AlertTriangle, ShieldCheck, Download, BookOpen } from "lucide-react";
 import { jsPDF } from "jspdf";
@@ -510,55 +511,90 @@ export default function Dashboard() {
     const handleDelete = async (idToDelete: string, event: MouseEvent) => {
         event.stopPropagation();
         if (!session?.access_token) return;
-        if (!window.confirm("Are you sure you want to permanently delete this item?")) {
-            return;
-        }
-        try {
-            await axios.delete(`${API_BASE_URL}/history/${idToDelete}`, {
-                headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            setHistory((prevHistory) =>
-                prevHistory.filter((item) => item.id !== idToDelete),
-            );
-            toast({ title: "Success", description: "History item deleted." });
-        } catch (err) {
-            console.error("Failed to delete history item:", err);
-            toast({
-                title: "Error",
-                description: "Could not delete the item.",
-                variant: "destructive",
-            });
-        }
+
+        // Show in-toast confirmation — no native browser dialog
+        toast({
+            title: "Delete document?",
+            description: "This will permanently remove the document from your history.",
+            action: (
+                <ToastAction
+                    altText="Confirm delete"
+                    className="bg-red-600 hover:bg-red-700 text-white border-0 text-xs font-semibold px-3 py-1.5 rounded-md h-auto transition-colors"
+                    onClick={async () => {
+                        try {
+                            await axios.delete(`${API_BASE_URL}/history/${idToDelete}`, {
+                                headers: { Authorization: `Bearer ${session.access_token}` },
+                            });
+                            setHistory((prevHistory) =>
+                                prevHistory.filter((item) => item.id !== idToDelete),
+                            );
+                            toast({
+                                title: "Deleted",
+                                description: "Document removed from your history.",
+                            });
+                        } catch (err) {
+                            console.error("Failed to delete history item:", err);
+                            toast({
+                                title: "Error",
+                                description: "Could not delete the document. Please try again.",
+                                variant: "destructive",
+                            });
+                        }
+                    }}
+                >
+                    Delete
+                </ToastAction>
+            ),
+        });
     };
 
     const handleDeleteSelected = async () => {
         if (selectedIds.length === 0) return;
         if (!session?.access_token) return;
-        if (!window.confirm(`Are you sure you want to permanently delete the ${selectedIds.length} selected document(s)?`)) {
-            return;
-        }
-        try {
-            await Promise.all(
-                selectedIds.map((id) =>
-                    axios.delete(`${API_BASE_URL}/history/${id}`, {
-                        headers: { Authorization: `Bearer ${session.access_token}` },
-                    })
-                )
-            );
-            setHistory((prevHistory) =>
-                prevHistory.filter((item) => !selectedIds.includes(item.id))
-            );
-            setSelectedIds([]);
-            toast({ title: "Success", description: "Selected history items deleted." });
-        } catch (err) {
-            console.error("Failed to delete history items:", err);
-            toast({
-                title: "Error",
-                description: "Could not delete some items.",
-                variant: "destructive",
-            });
-            fetchHistory();
-        }
+
+        const count = selectedIds.length;
+        const idsSnapshot = [...selectedIds];
+
+        // Show in-toast confirmation — no native browser dialog
+        toast({
+            title: `Delete ${count} document${count > 1 ? "s" : ""}?`,
+            description: `This will permanently remove ${count} selected document${count > 1 ? "s" : ""} from your history.`,
+            action: (
+                <ToastAction
+                    altText="Confirm delete selected"
+                    className="bg-red-600 hover:bg-red-700 text-white border-0 text-xs font-semibold px-3 py-1.5 rounded-md h-auto transition-colors"
+                    onClick={async () => {
+                        try {
+                            await Promise.all(
+                                idsSnapshot.map((id) =>
+                                    axios.delete(`${API_BASE_URL}/history/${id}`, {
+                                        headers: { Authorization: `Bearer ${session.access_token}` },
+                                    })
+                                )
+                            );
+                            setHistory((prevHistory) =>
+                                prevHistory.filter((item) => !idsSnapshot.includes(item.id))
+                            );
+                            setSelectedIds([]);
+                            toast({
+                                title: "Deleted",
+                                description: `${count} document${count > 1 ? "s" : ""} removed from your history.`,
+                            });
+                        } catch (err) {
+                            console.error("Failed to delete history items:", err);
+                            toast({
+                                title: "Error",
+                                description: "Could not delete some documents. Please try again.",
+                                variant: "destructive",
+                            });
+                            fetchHistory();
+                        }
+                    }}
+                >
+                    Delete All
+                </ToastAction>
+            ),
+        });
     };
 
     const handleSignOut = async () => {
