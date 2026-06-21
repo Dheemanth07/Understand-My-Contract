@@ -24,127 +24,138 @@ try {
 export const supabase = new Proxy(originalSupabase, {
     get(target, prop) {
         if (prop === 'auth') {
-            return {
-                ...target.auth,
-                signUp: async (credentials: any) => {
-                    const email = credentials.email;
-                    if (email && (email.startsWith("test_corp_") || email === "test_corp_user_123@legalsimplify.com" || email.includes("mock") || email === "test.corp.user.123@gmail.com" || email.includes("unique"))) {
-                        localSession = {
-                            access_token: "mock-token-123",
-                            token_type: "bearer",
-                            expires_in: 3600,
-                            user: {
-                                id: "mock-user-id",
-                                email,
-                                user_metadata: credentials.options?.data || {}
+            return new Proxy(target.auth, {
+                get(authTarget, authProp) {
+                    if (authProp === 'signUp') {
+                        return async (credentials: any) => {
+                            const email = credentials.email;
+                            if (email && (email.startsWith("test_corp_") || email === "test_corp_user_123@legalsimplify.com" || email.includes("mock") || email === "test.corp.user.123@gmail.com" || email.includes("unique"))) {
+                                localSession = {
+                                    access_token: "mock-token-123",
+                                    token_type: "bearer",
+                                    expires_in: 3600,
+                                    user: {
+                                        id: "mock-user-id",
+                                        email,
+                                        user_metadata: credentials.options?.data || {}
+                                    }
+                                };
+                                try {
+                                    if (typeof window !== "undefined" && window.localStorage) {
+                                        window.localStorage.setItem("supabase_mock_session", JSON.stringify(localSession));
+                                    }
+                                } catch (e) {}
+                                setTimeout(() => {
+                                    authListeners.forEach(listener => listener("SIGNED_IN", localSession));
+                                }, 0);
+                                return { data: { user: localSession.user, session: localSession }, error: null };
                             }
+                            return authTarget.signUp(credentials);
                         };
-                        try {
-                            if (typeof window !== "undefined" && window.localStorage) {
-                                window.localStorage.setItem("supabase_mock_session", JSON.stringify(localSession));
-                            }
-                        } catch (e) {}
-                        setTimeout(() => {
-                            authListeners.forEach(listener => listener("SIGNED_IN", localSession));
-                        }, 0);
-                        return { data: { user: localSession.user, session: localSession }, error: null };
                     }
-                    return target.auth.signUp(credentials);
-                },
-                signInWithPassword: async (credentials: any) => {
-                    const email = credentials.email;
-                    if (email && (email.startsWith("test_corp_") || email === "test_corp_user_123@legalsimplify.com" || email.includes("mock") || email === "test.corp.user.123@gmail.com" || email.includes("unique"))) {
-                        localSession = {
-                            access_token: "mock-token-123",
-                            token_type: "bearer",
-                            expires_in: 3600,
-                            user: {
-                                id: "mock-user-id",
-                                email,
-                                user_metadata: {}
+                    if (authProp === 'signInWithPassword') {
+                        return async (credentials: any) => {
+                            const email = credentials.email;
+                            if (email && (email.startsWith("test_corp_") || email === "test_corp_user_123@legalsimplify.com" || email.includes("mock") || email === "test.corp.user.123@gmail.com" || email.includes("unique"))) {
+                                localSession = {
+                                    access_token: "mock-token-123",
+                                    token_type: "bearer",
+                                    expires_in: 3600,
+                                    user: {
+                                        id: "mock-user-id",
+                                        email,
+                                        user_metadata: {}
+                                    }
+                                };
+                                try {
+                                    if (typeof window !== "undefined" && window.localStorage) {
+                                        window.localStorage.setItem("supabase_mock_session", JSON.stringify(localSession));
+                                    }
+                                } catch (e) {}
+                                setTimeout(() => {
+                                    authListeners.forEach(listener => listener("SIGNED_IN", localSession));
+                                }, 0);
+                                return { data: { user: localSession.user, session: localSession }, error: null };
                             }
+                            return authTarget.signInWithPassword(credentials);
                         };
-                        try {
-                            if (typeof window !== "undefined" && window.localStorage) {
-                                window.localStorage.setItem("supabase_mock_session", JSON.stringify(localSession));
+                    }
+                    if (authProp === 'signOut') {
+                        return async () => {
+                            if (localSession) {
+                                localSession = null;
+                                try {
+                                    if (typeof window !== "undefined" && window.localStorage) {
+                                        window.localStorage.removeItem("supabase_mock_session");
+                                    }
+                                } catch (e) {}
+                                setTimeout(() => {
+                                    authListeners.forEach(listener => listener("SIGNED_OUT", null));
+                                }, 0);
+                                return { error: null };
                             }
-                        } catch (e) {}
-                        setTimeout(() => {
-                            authListeners.forEach(listener => listener("SIGNED_IN", localSession));
-                        }, 0);
-                        return { data: { user: localSession.user, session: localSession }, error: null };
+                            return authTarget.signOut();
+                        };
                     }
-                    return target.auth.signInWithPassword(credentials);
-                },
-                signOut: async () => {
-                    if (localSession) {
-                        localSession = null;
-                        try {
-                            if (typeof window !== "undefined" && window.localStorage) {
-                                window.localStorage.removeItem("supabase_mock_session");
+                    if (authProp === 'getSession') {
+                        return async () => {
+                            if (localSession) {
+                                return { data: { session: localSession }, error: null };
                             }
-                        } catch (e) {}
-                        setTimeout(() => {
-                            authListeners.forEach(listener => listener("SIGNED_OUT", null));
-                        }, 0);
-                        return { error: null };
+                            return authTarget.getSession();
+                        };
                     }
-                    return target.auth.signOut();
-                },
-                getSession: async () => {
-                    if (localSession) {
-                        return { data: { session: localSession }, error: null };
+                    if (authProp === 'getUser') {
+                        return async (jwt?: string) => {
+                            if (localSession) {
+                                return { data: { user: localSession.user }, error: null };
+                            }
+                            return authTarget.getUser(jwt);
+                        };
                     }
-                    return target.auth.getSession();
-                },
-                getUser: async (jwt?: string) => {
-                    if (localSession) {
-                        return { data: { user: localSession.user }, error: null };
-                    }
-                    return target.auth.getUser(jwt);
-                },
-                onAuthStateChange: (callback: any) => {
-                    authListeners.add(callback);
+                    if (authProp === 'onAuthStateChange') {
+                        return (callback: any) => {
+                            authListeners.add(callback);
 
-                    // Wrap the callback so we can control what events from the real Supabase
-                    // reach the listener when we are using a mock/local session.
-                    const wrappedCallback = (event: string, session: any) => {
-                        if (localSession) {
-                            // If we have a local mock session, ignore any events from the real Supabase
-                            // client that tell us there is no session (null).
-                            if (!session) {
-                                return;
-                            }
-                        }
-                        callback(event, session);
-                    };
-
-                    // Emit current session status ONLY if we have a local session.
-                    // If localSession is null, let the original Supabase onAuthStateChange
-                    // query the session asynchronously and trigger the callback with the actual
-                    // initial session state. This avoids kicking real users out to /signin on refresh.
-                    if (localSession) {
-                        setTimeout(() => {
-                            callback("SIGNED_IN", localSession);
-                        }, 0);
-                    }
-                    
-                    const sub = target.auth.onAuthStateChange(wrappedCallback);
-                    
-                    return {
-                        data: {
-                            subscription: {
-                                unsubscribe: () => {
-                                    authListeners.delete(callback);
-                                    if (sub && sub.data && sub.data.subscription) {
-                                        sub.data.subscription.unsubscribe();
+                            const wrappedCallback = (event: string, session: any) => {
+                                if (localSession) {
+                                    if (!session) {
+                                        return;
                                     }
                                 }
+                                callback(event, session);
+                            };
+
+                            if (localSession) {
+                                setTimeout(() => {
+                                    callback("SIGNED_IN", localSession);
+                                }, 0);
                             }
-                        }
-                    };
+                            
+                            const sub = authTarget.onAuthStateChange(wrappedCallback);
+                            
+                            return {
+                                data: {
+                                    subscription: {
+                                        unsubscribe: () => {
+                                            authListeners.delete(callback);
+                                            if (sub && sub.data && sub.data.subscription) {
+                                                sub.data.subscription.unsubscribe();
+                                            }
+                                        }
+                                    }
+                                }
+                            };
+                        };
+                    }
+
+                    const val = (authTarget as any)[authProp];
+                    if (typeof val === 'function') {
+                        return val.bind(authTarget);
+                    }
+                    return val;
                 }
-            };
+            });
         }
         return (target as any)[prop];
     }
