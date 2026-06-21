@@ -61,8 +61,9 @@ export default function SignupPage() {
                 }
                 toast({
                     title: "Signup successful!",
-                    description: "Please check your email to verify your account.",
+                    description: "Your account has been created successfully. Please sign in.",
                 });
+                navigate("/signin");
                 return;
             }
 
