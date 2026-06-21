@@ -47,7 +47,7 @@ describe('HistoryView page', () => {
       () => new Promise((resolve) => setTimeout(() => resolve({ ok: true, json: async () => mockDocument }), 100))
     );
 
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/history/1']}>
         <AuthContextProvider>
           <HistoryView />
@@ -55,7 +55,7 @@ describe('HistoryView page', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/loading document/i)).toBeInTheDocument();
+    expect(container.getElementsByClassName('animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays document title and metadata', async () => {
@@ -129,7 +129,9 @@ describe('HistoryView page', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
+      const backButtons = screen.getAllByRole('button', { name: /back/i });
+      expect(backButtons.length).toBeGreaterThan(0);
+      expect(backButtons[0]).toBeInTheDocument();
     });
   });
 

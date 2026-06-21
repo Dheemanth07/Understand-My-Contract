@@ -1,4 +1,7 @@
 import '@testing-library/jest-dom';
+import { TextEncoder, TextDecoder } from 'util';
+global.TextEncoder = TextEncoder;
+(global as any).TextDecoder = TextDecoder;
 
 // Set up environment variables for tests
 process.env.VITE_SUPABASE_URL = 'https://test.supabase.co';
@@ -103,6 +106,15 @@ beforeAll(() => {
   // Mock window.confirm, scrollIntoView and document.querySelector safe defaults
   window.confirm = jest.fn(() => true);
   Element.prototype.scrollIntoView = jest.fn();
+  if (typeof Element.prototype.hasPointerCapture === 'undefined') {
+    Element.prototype.hasPointerCapture = () => false;
+  }
+  if (typeof Element.prototype.setPointerCapture === 'undefined') {
+    Element.prototype.setPointerCapture = () => {};
+  }
+  if (typeof Element.prototype.releasePointerCapture === 'undefined') {
+    Element.prototype.releasePointerCapture = () => {};
+  }
   const originalQuery = document.querySelector.bind(document);
   document.querySelector = (selector: string) => originalQuery(selector);
 

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '@/routes/Dashboard';
 import { AuthContextProvider } from '@/context/AuthContext';
+import { Toaster } from '@/components/ui/toaster';
 import axios from 'axios';
 
 // Mock supabase client
@@ -152,6 +153,7 @@ describe('Dashboard', () => {
       <MemoryRouter>
         <AuthContextProvider>
           <Dashboard />
+          <Toaster />
         </AuthContextProvider>
       </MemoryRouter>
     );
@@ -160,8 +162,14 @@ describe('Dashboard', () => {
       expect(screen.getByText('document1.pdf')).toBeInTheDocument();
     });
 
-    const deleteButton = screen.getByRole('button', { name: /delete/i });
+    const checkbox = screen.getByTestId('history-item-1').querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await user.click(checkbox);
+
+    const deleteButton = screen.getByRole('button', { name: /delete selected/i });
     await user.click(deleteButton);
+
+    const confirmButton = screen.getByRole('button', { name: /^delete$/i });
+    await user.click(confirmButton);
 
     await waitFor(() => {
       expect(mockedAxios.delete).toHaveBeenCalledWith(

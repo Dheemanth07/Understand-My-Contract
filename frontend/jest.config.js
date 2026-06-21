@@ -9,6 +9,7 @@ export default {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/src/__tests__/utils/fileMock.js',
     '^@/(.*)$': '<rootDir>/src/$1',
+    '^jspdf$': 'jspdf/dist/jspdf.node.min.js',
   },
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   collectCoverageFrom: [
