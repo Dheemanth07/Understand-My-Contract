@@ -2,6 +2,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import { pathToFileURL } from 'url';
 
 const require = createRequire(import.meta.url);
 
@@ -94,7 +95,7 @@ log('Validating PostCSS configuration...');
 const postcssConfigPath = path.join(projectRoot, 'postcss.config.js');
 if (fs.existsSync(postcssConfigPath)) {
   try {
-    require(postcssConfigPath);
+    await import(pathToFileURL(postcssConfigPath).href);
   } catch (error) {
     console.error('Error loading postcss.config.js:', error);
     allValid = false;
