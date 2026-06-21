@@ -1,8 +1,13 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const app = express();
+
+// Secure Express headers
+app.use(helmet());
 
 const corsOptions = {
     origin: function (origin, callback) {
@@ -38,11 +43,30 @@ app.use(cors(corsOptions));
 app.options(/^.*$/, cors(corsOptions));
 app.use(express.json());
 
+// Global API Rate Limiter
+const globalLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 300, // Limit each IP to 300 requests per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests from this IP, please try again later." }
+});
+app.use(globalLimiter);
+
+// Stricter Rate Limiter for Document Uploads
+const uploadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 15, // Limit each IP to 15 document uploads per 15 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many uploads. Please wait 15 minutes before uploading more documents." }
+});
+
 // Mount routers
 const uploadRouter = require("./features/upload/routes/uploadRoutes");
 const historyRouter = require("./features/history/routes/historyRoutes");
 
-app.use("/upload", uploadRouter);
+app.use("/upload", uploadLimiter, uploadRouter);
 app.use("/history", historyRouter);
 
 module.exports = app;
