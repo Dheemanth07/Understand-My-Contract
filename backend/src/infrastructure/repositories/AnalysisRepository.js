@@ -4,8 +4,12 @@ async function create(data) {
     return Analysis.create(data);
 }
 
-async function pushSection(analysisId, sectionData) {
-    return Analysis.updateOne({ _id: analysisId }, { $push: { sections: sectionData } });
+async function pushSection(analysisId, sectionData, glossaryData) {
+    const update = { $push: { sections: sectionData } };
+    if (glossaryData) {
+        update.$set = { glossary: glossaryData };
+    }
+    return Analysis.updateOne({ _id: analysisId }, update);
 }
 
 async function setCompleted(analysisId, glossary, risks = []) {

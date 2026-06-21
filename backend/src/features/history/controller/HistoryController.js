@@ -20,11 +20,16 @@ async function getMergedGlossaryHandler(req, res) {
     return HistoryService.getMergedGlossary(req, res);
 }
 
+async function stopHandler(req, res) {
+    return HistoryService.stop(req, res);
+}
+
 module.exports = {
     listHandler,
     getByIdHandler,
     deleteHandler,
     chatHandler,
     getMergedGlossaryHandler,
+    stopHandler,
 };
 

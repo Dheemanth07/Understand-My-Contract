@@ -363,7 +363,7 @@ async function lookupDefinition(word) {
     }
 
     try {
-        const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
+        const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
         const meanings = resp.data[0]?.meanings;
         if (!meanings || meanings.length === 0) {
             return '(Definition not found)';

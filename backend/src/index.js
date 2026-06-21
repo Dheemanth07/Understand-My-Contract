@@ -35,8 +35,8 @@ async function connectDB() {
 
 if (require.main === module || (require.main && require.main.filename && (require.main.filename.endsWith("server.js") || require.main.filename.endsWith("index.js")))) {
     connectDB().then(() => {
-        app.listen(PORT, () => {
-            console.log(`✅ Server listening on port ${PORT}...`);
+        app.listen(PORT, "0.0.0.0", () => {
+            console.log(`✅ Server listening on port ${PORT} (0.0.0.0)...`);
         });
     });
 }

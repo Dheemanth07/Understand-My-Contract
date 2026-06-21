@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToastAction } from "@/components/ui/toast";
 import Logo from "@/components/Logo";
-import { Clock, FileText, Trash2, LogOut, UploadCloud, Globe, AlertCircle, Sparkles, ChevronRight, MessageSquare, Send, X, AlertTriangle, ShieldCheck, Download, BookOpen } from "lucide-react";
+import { Clock, FileText, Trash2, LogOut, UploadCloud, Globe, AlertCircle, Sparkles, ChevronRight, MessageSquare, Send, X, AlertTriangle, ShieldCheck, Download, BookOpen, Menu } from "lucide-react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -62,6 +62,7 @@ export default function Dashboard() {
     const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const checkScrollPosition = useCallback(() => {
         const docHeight = document.documentElement.scrollHeight;
@@ -100,7 +101,7 @@ export default function Dashboard() {
                 description: "Your document is still being processed. Resuming progress tracking.",
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session]);
 
     useEffect(() => {
@@ -255,12 +256,22 @@ export default function Dashboard() {
         const idToStop = activeAnalysisId || sessionStorage.getItem("activeAnalysisId");
         if (idToStop && session?.access_token) {
             try {
-                // Delete the doc on backend so background job exits on next heartbeat check
-                await axios.delete(`${API_BASE_URL}/history/${idToStop}`, {
+                // Stop the doc processing on backend so status becomes completed
+                await axios.post(`${API_BASE_URL}/history/${idToStop}/stop`, {}, {
                     headers: { Authorization: `Bearer ${session.access_token}` },
                 });
+
+                // Fetch latest state to ensure sections and glossary are synchronized
+                const resp = await axios.get(`${API_BASE_URL}/history/${idToStop}`, {
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                });
+                if (resp.data) {
+                    setAnalysisResults(resp.data.sections || []);
+                    setRisks(resp.data.risks || []);
+                    if (resp.data.filename) setActiveDocumentName(resp.data.filename);
+                }
             } catch (err) {
-                console.error("Failed to delete processing analysis:", err);
+                console.error("Failed to stop processing analysis:", err);
             }
         }
         // Clear sessionStorage immediately so the restored state doesn't persist
@@ -268,11 +279,7 @@ export default function Dashboard() {
         sessionStorage.removeItem("uploading");
         setUploading(false);
         setActiveAnalysisId(null);
-        setAnalysisResults([]);
-        setRisks([]);
         setFile(null);
-        setActiveDocumentName("");
-        setChatMessages([]);
         fetchHistory();
     };
 
@@ -297,173 +304,271 @@ export default function Dashboard() {
             // Ensure all fonts are fully loaded for perfect text shaping
             await document.fonts.ready;
 
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: "#f8fafc",
-                windowWidth: 1200, // Force standard desktop viewport width
-                onclone: (clonedDoc) => {
-                    // Hide header buttons/actions and ignored components in cloned DOM
-                    const ignoreSelectors = [
-                        "[data-html2canvas-ignore]",
-                        "button",
-                        "a",
-                        "select",
-                        "input",
-                        ".fixed",
-                        ".floating-actions",
-                        "header div.flex.items-center.gap-2.shrink-0",
-                        "header .flex.items-center.gap-2"
-                    ];
-                    ignoreSelectors.forEach((selector) => {
-                        clonedDoc.querySelectorAll(selector).forEach((el) => {
-                            (el as HTMLElement).style.setProperty("display", "none", "important");
-                        });
-                    });
+            // 1. Create temporary off-screen clone of the report container
+            const clonedElement = element.cloneNode(true) as HTMLElement;
+            clonedElement.id = "pdf-report-content-clone";
+            
+            clonedElement.style.position = "absolute";
+            clonedElement.style.left = "-9999px";
+            clonedElement.style.top = "0";
+            clonedElement.style.width = "1024px";
+            clonedElement.style.maxWidth = "1024px";
+            clonedElement.style.minWidth = "1024px";
+            clonedElement.style.background = "#f8fafc";
+            clonedElement.style.padding = "32px";
+            clonedElement.style.boxSizing = "border-box";
 
-                    // Force the report content element to use explicit desktop width
-                    const reportContent = clonedDoc.getElementById("pdf-report-content");
-                    if (reportContent) {
-                        reportContent.style.setProperty("width", "1024px", "important");
-                        reportContent.style.setProperty("max-width", "1024px", "important");
-                        reportContent.style.setProperty("min-width", "1024px", "important");
-                        reportContent.style.setProperty("margin", "0 auto", "important");
-                        reportContent.style.setProperty("padding", "32px", "important");
-                        reportContent.style.setProperty("box-sizing", "border-box", "important");
+            document.body.appendChild(clonedElement);
+
+            // 2. Hide ignored components in the clone
+            const ignoreSelectors = [
+                "[data-html2canvas-ignore]",
+                "button",
+                "a",
+                "select",
+                "input",
+                ".fixed",
+                ".floating-actions",
+                "header div.flex.items-center.gap-2.shrink-0",
+                "header .flex.items-center.gap-2"
+            ];
+            ignoreSelectors.forEach((selector) => {
+                clonedElement.querySelectorAll(selector).forEach((el) => {
+                    (el as HTMLElement).style.setProperty("display", "none", "important");
+                });
+            });
+
+            // 3. Fix truncation: remove overflow/clip/ellipsis on ALL elements
+            clonedElement.querySelectorAll("*").forEach((el) => {
+                const htmlEl = el as HTMLElement;
+                if (
+                    htmlEl.classList.contains("truncate") ||
+                    htmlEl.classList.contains("overflow-hidden") ||
+                    htmlEl.classList.contains("min-w-0")
+                ) {
+                    htmlEl.style.setProperty("overflow", "visible", "important");
+                    htmlEl.style.setProperty("text-overflow", "clip", "important");
+                    htmlEl.style.setProperty("white-space", "normal", "important");
+                }
+            });
+
+            // 4. Compact print spacing on header
+            const header = clonedElement.querySelector("header");
+            if (header) {
+                (header as HTMLElement).style.setProperty("padding-bottom", "16px", "important");
+                (header as HTMLElement).style.setProperty("margin-bottom", "8px", "important");
+                (header as HTMLElement).style.setProperty("display", "block", "important");
+            }
+            // Make the h2/h3 titles wrap freely, have compact margins, and padding to prevent ascender/descender cropping
+            clonedElement.querySelectorAll("h2, h3").forEach((h) => {
+                const htmlEl = h as HTMLElement;
+                htmlEl.style.setProperty("white-space", "normal", "important");
+                htmlEl.style.setProperty("overflow", "visible", "important");
+                htmlEl.style.setProperty("text-overflow", "clip", "important");
+                htmlEl.style.setProperty("word-break", "break-word", "important");
+                htmlEl.style.setProperty("margin-top", "2px", "important");
+                htmlEl.style.setProperty("margin-bottom", "4px", "important");
+                htmlEl.style.setProperty("padding-top", "4px", "important");
+                htmlEl.style.setProperty("padding-bottom", "4px", "important");
+                htmlEl.style.setProperty("font-size", "14px", "important");
+            });
+
+            // 5. Card content padding adjustments (more compact for high print density)
+            clonedElement.querySelectorAll(".p-4").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "10px", "important");
+            });
+            clonedElement.querySelectorAll(".p-5").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "12px", "important");
+            });
+            clonedElement.querySelectorAll(".p-3").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "8px", "important");
+            });
+            clonedElement.querySelectorAll(".p-2\\.5, .p-2").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "6px", "important");
+            });
+
+            // Make original text, simplified summary, and key terms compact in PDF
+            clonedElement.querySelectorAll(".bg-slate-50, .bg-blue-50\\/60, .bg-white, card").forEach((card) => {
+                const htmlEl = card as HTMLElement;
+                htmlEl.querySelectorAll("p, li, div, span, strong").forEach((el) => {
+                    const child = el as HTMLElement;
+                    if (child.tagName !== "H1" && child.tagName !== "H2" && child.tagName !== "H3" && child.tagName !== "H4") {
+                        child.style.setProperty("font-size", "10px", "important");
+                        child.style.setProperty("line-height", "1.3", "important");
                     }
+                });
+            });
 
-                    // ── Fix truncation: remove overflow/clip/ellipsis on ALL elements ──
-                    clonedDoc.querySelectorAll("*").forEach((el) => {
-                        const htmlEl = el as HTMLElement;
-                        if (
-                            htmlEl.classList.contains("truncate") ||
-                            htmlEl.classList.contains("overflow-hidden") ||
-                            htmlEl.classList.contains("min-w-0")
-                        ) {
-                            htmlEl.style.setProperty("overflow", "visible", "important");
-                            htmlEl.style.setProperty("text-overflow", "clip", "important");
-                            htmlEl.style.setProperty("white-space", "normal", "important");
-                        }
+            // 6. Vertical breathing room
+            clonedElement.querySelectorAll("[class*='space-y-4'], [class*='space-y-6']").forEach((el) => {
+                (el as HTMLElement).style.setProperty("row-gap", "10px", "important");
+            });
+
+            clonedElement.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
+                (card as HTMLElement).style.setProperty("margin-bottom", "10px", "important");
+                // Clear any manual margin-top applied previously
+                (card as HTMLElement).style.setProperty("margin-top", "0px", "important");
+            });
+
+            // 7. Convert Grid to Flex with wrap support
+            const grids = clonedElement.querySelectorAll(".grid");
+            grids.forEach((grid) => {
+                const el = grid as HTMLElement;
+                let cols = 1;
+                if (el.classList.contains("md:grid-cols-3") || el.classList.contains("grid-cols-3")) {
+                    cols = 3;
+                } else if (el.classList.contains("md:grid-cols-2") || el.classList.contains("grid-cols-2")) {
+                    cols = 2;
+                }
+
+                el.style.setProperty("display", "flex", "important");
+                el.style.setProperty("flex-direction", "row", "important");
+                el.style.setProperty("flex-wrap", "wrap", "important"); // Allow wrapping (highly important for glossary/many cards)
+                el.style.setProperty("gap", "12px", "important");
+                el.style.setProperty("width", "100%", "important");
+                el.style.setProperty("box-sizing", "border-box", "important");
+                el.style.setProperty("margin-bottom", "12px", "important");
+
+                const children = Array.from(el.children);
+                if (cols > 1 && children.length > 0) {
+                    const gapValue = 12; // 12px gap
+                    const widthCalc = `calc(${(100 / cols).toFixed(2)}% - ${((cols - 1) * gapValue / cols).toFixed(2)}px)`;
+                    children.forEach((child) => {
+                        const childEl = child as HTMLElement;
+                        childEl.style.setProperty("width", widthCalc, "important");
+                        childEl.style.setProperty("max-width", widthCalc, "important");
+                        childEl.style.setProperty("box-sizing", "border-box", "important");
+                        childEl.style.setProperty("display", "block", "important");
+                        childEl.style.setProperty("overflow", "visible", "important");
+                        childEl.style.setProperty("min-width", "0", "important");
                     });
-
-                    // ── Generous spacing on header ──
-                    const header = clonedDoc.querySelector("header");
-                    if (header) {
-                        (header as HTMLElement).style.setProperty("padding-bottom", "28px", "important");
-                        (header as HTMLElement).style.setProperty("margin-bottom", "12px", "important");
-                        (header as HTMLElement).style.setProperty("display", "block", "important");
-                    }
-                    // Make the h2 report title wrap freely
-                    clonedDoc.querySelectorAll("h2").forEach((h) => {
-                        (h as HTMLElement).style.setProperty("white-space", "normal", "important");
-                        (h as HTMLElement).style.setProperty("overflow", "visible", "important");
-                        (h as HTMLElement).style.setProperty("text-overflow", "clip", "important");
-                        (h as HTMLElement).style.setProperty("word-break", "break-word", "important");
-                        (h as HTMLElement).style.setProperty("margin-bottom", "6px", "important");
-                    });
-
-                    // ── Card content: generous padding on all cards ──
-                    clonedDoc.querySelectorAll(".p-4").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "20px", "important");
-                    });
-                    clonedDoc.querySelectorAll(".p-5").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "22px", "important");
-                    });
-                    clonedDoc.querySelectorAll(".p-3").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "16px", "important");
-                    });
-
-                    // ── Add vertical breathing room between section result cards ──
-                    clonedDoc.querySelectorAll("[class*='space-y-4'], [class*='space-y-6']").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("row-gap", "24px", "important");
-                    });
-
-                    // ── Individual result/info cards: add margin between them ──
-                    clonedDoc.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
-                        (card as HTMLElement).style.setProperty("margin-bottom", "20px", "important");
-                    });
-
-                    // ── Convert all CSS Grid elements to robust flex/block elements ──
-                    const grids = clonedDoc.querySelectorAll(".grid");
-                    grids.forEach((grid) => {
-                        const el = grid as HTMLElement;
-                        
-                        let cols = 1;
-                        if (el.classList.contains("md:grid-cols-3") || el.classList.contains("grid-cols-3")) {
-                            cols = 3;
-                        } else if (el.classList.contains("md:grid-cols-2") || el.classList.contains("grid-cols-2")) {
-                            cols = 2;
-                        }
-
-                        el.style.setProperty("display", "flex", "important");
-                        el.style.setProperty("flex-direction", "row", "important");
-                        el.style.setProperty("flex-wrap", "nowrap", "important");
-                        el.style.setProperty("gap", "20px", "important");
-                        el.style.setProperty("width", "100%", "important");
-                        el.style.setProperty("box-sizing", "border-box", "important");
-                        el.style.setProperty("margin-bottom", "20px", "important");
-
-                        const children = Array.from(el.children);
-                        if (cols > 1 && children.length > 0) {
-                            const widthPercent = Math.floor(100 / cols) - 2;
-                            children.forEach((child) => {
-                                const childEl = child as HTMLElement;
-                                childEl.style.setProperty("width", `${widthPercent}%`, "important");
-                                childEl.style.setProperty("max-width", `${widthPercent}%`, "important");
-                                childEl.style.setProperty("flex", "1 1 0%", "important");
-                                childEl.style.setProperty("box-sizing", "border-box", "important");
-                                childEl.style.setProperty("display", "block", "important");
-                                childEl.style.setProperty("overflow", "visible", "important");
-                                childEl.style.setProperty("min-width", "0", "important");
-                            });
-                        } else {
-                            el.style.setProperty("flex-direction", "column", "important");
-                            children.forEach((child) => {
-                                const childEl = child as HTMLElement;
-                                childEl.style.setProperty("width", "100%", "important");
-                                childEl.style.setProperty("max-width", "100%", "important");
-                                childEl.style.setProperty("box-sizing", "border-box", "important");
-                                childEl.style.setProperty("display", "block", "important");
-                                childEl.style.setProperty("overflow", "visible", "important");
-                            });
-                        }
-                    });
-
-                    // Avoid flex wrap badge collapsing issues
-                    const flexWraps = clonedDoc.querySelectorAll(".flex.flex-wrap");
-                    flexWraps.forEach((flex) => {
-                        const el = flex as HTMLElement;
-                        el.style.setProperty("display", "flex", "important");
-                        el.style.setProperty("flex-direction", "row", "important");
-                        el.style.setProperty("flex-wrap", "wrap", "important");
-                        el.style.setProperty("gap", "8px", "important");
+                } else {
+                    el.style.setProperty("flex-direction", "column", "important");
+                    children.forEach((child) => {
+                        const childEl = child as HTMLElement;
+                        childEl.style.setProperty("width", "100%", "important");
+                        childEl.style.setProperty("max-width", "100%", "important");
+                        childEl.style.setProperty("box-sizing", "border-box", "important");
+                        childEl.style.setProperty("display", "block", "important");
+                        childEl.style.setProperty("overflow", "visible", "important");
                     });
                 }
             });
 
-            const imgData = canvas.toDataURL("image/png");
-            
-            const pdf = new jsPDF("p", "mm", "a4");
-            const imgWidth = 210;
-            const pageHeight = 295;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 0;
+            const flexWraps = clonedElement.querySelectorAll(".flex.flex-wrap");
+            flexWraps.forEach((flex) => {
+                const el = flex as HTMLElement;
+                el.style.setProperty("display", "flex", "important");
+                el.style.setProperty("flex-direction", "row", "important");
+                el.style.setProperty("flex-wrap", "wrap", "important");
+                el.style.setProperty("gap", "8px", "important");
+            });
 
-            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+            // Group the heading/title with the first following element in the clone to prevent clipping/orphans
+            const titleRow = clonedElement.querySelector("div.flex.items-center.justify-between") as HTMLElement;
+            if (titleRow) {
+                const next = titleRow.nextElementSibling as HTMLElement;
+                if (next) {
+                    let firstCard = next;
+                    if (next.classList.contains("space-y-4")) {
+                        firstCard = next.firstElementChild as HTMLElement;
+                    }
+                    
+                    if (firstCard) {
+                        const groupWrapper = document.createElement("div");
+                        groupWrapper.className = "pdf-grouped-block";
+                        groupWrapper.style.setProperty("display", "block", "important");
+                        groupWrapper.style.setProperty("margin-bottom", "16px", "important");
+                        
+                        titleRow.parentNode?.insertBefore(groupWrapper, titleRow);
+                        groupWrapper.appendChild(titleRow);
+                        groupWrapper.appendChild(firstCard);
+                        titleRow.style.setProperty("margin-bottom", "8px", "important");
+                    }
+                }
             }
+
+            // 8. Extract blocks to render
+            const blocks: HTMLElement[] = [];
+            Array.from(clonedElement.children).forEach((child) => {
+                const childEl = child as HTMLElement;
+                if (childEl.hasAttribute("data-html2canvas-ignore") || childEl.style.display === "none") {
+                    return;
+                }
+
+                // If this is the sections wrapper, grab its children (the actual section cards, starting from card 2)
+                if (childEl.classList.contains("space-y-4") && childEl.querySelector(".pdf-avoid-break")) {
+                    Array.from(childEl.children).forEach((sectionCard) => {
+                        const cardEl = sectionCard as HTMLElement;
+                        if (!cardEl.hasAttribute("data-html2canvas-ignore") && cardEl.style.display !== "none") {
+                            blocks.push(cardEl);
+                        }
+                    });
+                } else {
+                    blocks.push(childEl);
+                }
+            });
+
+            // 9. Render blocks sequentially to jsPDF
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            const margin = 10;
+            const printableWidth = pdfWidth - (2 * margin);
+            const printableHeight = pdfHeight - (2 * margin);
+            let currentY = margin;
+            let isFirstPage = true;
+
+            const canvasCache = new Map<HTMLElement, { canvas: HTMLCanvasElement; heightMm: number; imgData: string }>();
+            
+            const getOrRenderBlock = async (el: HTMLElement) => {
+                if (canvasCache.has(el)) {
+                    return canvasCache.get(el)!;
+                }
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: "#f8fafc",
+                });
+                const imgData = canvas.toDataURL("image/png");
+                const heightMm = (canvas.height * printableWidth) / canvas.width;
+                const result = { canvas, heightMm, imgData };
+                canvasCache.set(el, result);
+                return result;
+            };
+
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                if (block.offsetHeight === 0) continue;
+
+                const { heightMm: blockHeightMm, imgData: blockImgData } = await getOrRenderBlock(block);
+                let totalHeightNeeded = blockHeightMm;
+
+                // Prevent orphan headings (H2, H3, or layout container with title)
+                const isHeadingElement = block.tagName === "H2" || block.tagName === "H3" || (block.classList.contains("flex") && block.querySelector("h2"));
+                if (isHeadingElement && i + 1 < blocks.length) {
+                    const nextBlock = blocks[i + 1];
+                    const { heightMm: nextHeightMm } = await getOrRenderBlock(nextBlock);
+                    totalHeightNeeded += nextHeightMm + 2.5;
+                }
+
+                if (!isFirstPage && currentY + totalHeightNeeded > pdfHeight - margin) {
+                    pdf.addPage();
+                    currentY = margin;
+                }
+
+                pdf.addImage(blockImgData, "PNG", margin, currentY, printableWidth, blockHeightMm);
+                currentY += blockHeightMm + 2.5;
+                isFirstPage = false;
+            }
+
+            // Cleanup cloned DOM
+            document.body.removeChild(clonedElement);
 
             const cleanName = (activeDocumentName || "simplified_contract").replace(/\.[^/.]+$/, "");
             pdf.save(`${cleanName}_simplified.pdf`);
-            
+
             toast({
                 title: "Success",
                 description: "PDF report exported successfully.",
@@ -598,7 +703,7 @@ export default function Dashboard() {
                         }
                     }}
                 >
-                    Delete All
+                    Delete
                 </ToastAction>
             ),
         });
@@ -624,15 +729,545 @@ export default function Dashboard() {
 
     return (
         <>
-        <div className="flex min-h-screen bg-slate-50 font-sans">
-            {/* --- SIDEBAR --- */}
-            <aside className="w-80 bg-slate-100 border-r border-slate-200 flex flex-col justify-between p-5 z-10 shrink-0 sticky top-0 h-screen overflow-y-auto">
-                <div className="flex flex-col min-h-0">
-                    <div className="mb-6 flex justify-start pl-1">
+            <div className="flex min-h-screen bg-slate-50 font-sans">
+                {/* --- SIDEBAR --- */}
+                <aside className="hidden md:flex w-80 bg-slate-100 border-r border-slate-200 flex-col justify-between p-5 z-10 shrink-0 sticky top-0 h-screen overflow-y-auto">
+                    <div className="flex flex-col min-h-0">
+                        <div className="mb-6 flex justify-start pl-1">
+                            <Logo />
+                        </div>
+
+                        <div className="mb-6 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                            <h2 className="text-sm font-bold text-slate-800 tracking-tight truncate">
+                                Hello, {userName}
+                            </h2>
+                            <p className="text-slate-500 text-[11px] mt-0.5 font-medium">
+                                Welcome to your Dashboard
+                            </p>
+                        </div>
+
+                        <div className="flex justify-between items-center mb-3 pl-1 pr-1">
+                            <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                Your History
+                            </h3>
+                            {history.length > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="checkbox"
+                                        id="select-all-history"
+                                        aria-label="Select all documents"
+                                        checked={history.length > 0 && selectedIds.length === history.length}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                setSelectedIds(history.map(item => item.id));
+                                            } else {
+                                                setSelectedIds([]);
+                                            }
+                                        }}
+                                        className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="select-all-history" className="text-[10px] font-semibold text-slate-500 cursor-pointer select-none">
+                                        Select All
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        {selectedIds.length > 0 && (
+                            <div className="mb-3 px-1">
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="w-full text-xs font-semibold h-8 rounded-md flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                                    onClick={handleDeleteSelected}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Delete Selected ({selectedIds.length})
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Scrollable list container */}
+                        <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
+                            {loadingHistory ? (
+                                <div className="space-y-2">
+                                    {[...Array(4)].map((_, i) => (
+                                        <div key={i} className="p-3 bg-white border border-slate-200 rounded-lg flex items-center gap-2.5 shadow-sm">
+                                            <div className="w-4 h-4 rounded bg-slate-200 animate-pulse shrink-0" />
+                                            <div className="flex-1 space-y-1.5">
+                                                <div className="h-3 bg-slate-200 rounded animate-pulse w-3/4" />
+                                                <div className="h-2.5 bg-slate-200 rounded animate-pulse w-1/2" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : history.length > 0 ? (
+                                history.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        data-testid={`history-item-${item.id}`}
+                                        className="p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-500/30 hover:bg-slate-50 cursor-pointer flex items-center transition-all group shadow-sm gap-2.5"
+                                        onClick={() => navigate(`/history/${item.id}`)}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(item.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedIds((prev) => [...prev, item.id]);
+                                                } else {
+                                                    setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+                                                }
+                                            }}
+                                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors">
+                                                {item.filename}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                                {new Date(item.createdAt).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+                                    No history yet.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </aside>
+
+                {/* --- MAIN CONTENT --- */}
+                <main
+                    className="flex-1 flex flex-col bg-slate-50/50"
+                >
+                    <div className="max-w-5xl w-full mx-auto px-6 py-8 space-y-6">
+                        {/* Header bar */}
+                        <header className="flex justify-between items-center pb-4 border-b border-slate-200/60">
+                            <div>
+                                <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                                    LegalSimplify Studio
+                                </h1>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    Convert raw legalese to plain language instantly.
+                                </p>
+                            </div>
+                            <div className="hidden md:flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
+                                    onClick={() => navigate("/glossary")}
+                                >
+                                    <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                                    Jargon Library
+                                </Button>
+                                {analysisResults.length > 0 && !uploading && (
+                                    <Button
+                                        variant="outline"
+                                        className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
+                                        onClick={handleExportPDF}
+                                        disabled={isExportingPDF}
+                                    >
+                                        {isExportingPDF ? (
+                                            <>
+                                                <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                                                Exporting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download className="w-3.5 h-3.5 text-emerald-600" />
+                                                Export PDF
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+                                <Button
+                                    variant="outline"
+                                    className="bg-white border-slate-300 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
+                                    onClick={handleSignOut}
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    Logout
+                                </Button>
+                            </div>
+
+                            {/* Mobile actions and hamburger menu */}
+                            <div className="md:hidden flex items-center gap-2">
+                                {analysisResults.length > 0 && !uploading && (
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="bg-white border-slate-300 hover:bg-slate-50 rounded-md h-10 w-10 shadow-sm flex items-center justify-center"
+                                        onClick={handleExportPDF}
+                                        disabled={isExportingPDF}
+                                        aria-label="Export PDF"
+                                    >
+                                        {isExportingPDF ? (
+                                            <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Download className="w-4 h-4 text-emerald-650" />
+                                        )}
+                                    </Button>
+                                )}
+                                <button
+                                    onClick={() => setIsMobileMenuOpen(true)}
+                                    className="w-10 h-10 border border-slate-200 hover:border-slate-300 rounded-lg bg-white shadow-sm flex items-center justify-center transition-all active:scale-95 text-slate-700"
+                                    aria-label="Open menu"
+                                >
+                                    <Menu className="w-5 h-5 text-teal-800" />
+                                </button>
+                            </div>
+                        </header>
+
+                        {/* Upload Card */}
+                        <Card className="bg-white border border-slate-200/80 p-6 shadow-sm rounded-lg space-y-5">
+                            <div className="space-y-5">
+                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                    <UploadCloud className="w-4 h-4 text-blue-600" />
+                                    Upload Your Legal Document
+                                </h2>
+
+                                {/* Dropzone container */}
+                                <div className="relative border border-dashed border-slate-300 hover:border-blue-500/50 rounded-lg p-5 flex flex-col items-center justify-center bg-slate-50/50 cursor-pointer transition-all hover:bg-slate-50 group">
+                                    <Label htmlFor="file-upload" className="absolute inset-0 cursor-pointer w-full h-full" />
+                                    <Input
+                                        id="file-upload"
+                                        type="file"
+                                        accept=".pdf,.docx,.txt"
+                                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                        className="hidden"
+                                        aria-label="Select a file"
+                                    />
+                                    <div className="space-y-2 text-center pointer-events-none">
+                                        <div className="w-10 h-10 mx-auto rounded-full bg-blue-50 flex items-center justify-center">
+                                            <FileText className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <div className="text-xs">
+                                            {file ? (
+                                                <span className="font-semibold text-blue-800 truncate max-w-xs block mx-auto">{file.name}</span>
+                                            ) : (
+                                                <span className="text-slate-500 font-semibold">Select a file (.pdf, .docx, .txt)</span>
+                                            )}
+                                        </div>
+                                        <p className="text-[10px] text-slate-400">
+                                            {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Max file size: 10MB"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Language Selector */}
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="output-language" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                        <Globe className="w-3.5 h-3.5 text-blue-600" />
+                                        Output Translation Language
+                                    </Label>
+                                    <select
+                                        id="output-language"
+                                        aria-label="Output Language"
+                                        value={language}
+                                        onChange={(e) => setLanguage(e.target.value)}
+                                        className="w-full h-10 px-3 border rounded-md bg-white border-slate-300 text-slate-700 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                                    >
+                                        <option value="en">English (Default)</option>
+                                        <option value="hi">Hindi (हिंदी)</option>
+                                        <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                                        <option value="ta">Tamil (தமிழ்)</option>
+                                        <option value="te">Telugu (తెలుగు)</option>
+                                        <option value="es">Spanish (Español)</option>
+                                        <option value="fr">French (Français)</option>
+                                    </select>
+                                </div>
+
+                                {/* Submit / Stop Buttons */}
+                                {!uploading ? (
+                                    <Button
+                                        data-testid="upload-button"
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition-all h-10 shadow-sm"
+                                        onClick={handleUpload}
+                                        disabled={!file}
+                                    >
+                                        Upload & Simplify
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="w-full border border-red-300 hover:border-red-400 bg-transparent hover:bg-red-50/30 text-red-600 font-semibold rounded-md transition-all h-10 shadow-sm gap-2"
+                                        onClick={handleStop}
+                                    >
+                                        <AlertCircle className="w-4 h-4 animate-pulse" />
+                                        Stop Processing
+                                    </Button>
+                                )}
+                            </div>
+                        </Card>
+
+                        {/* --- RESULTS SECTION --- */}
+                        {analysisResults.length > 0 && (
+                            <div id="pdf-report-content" className="space-y-4 pt-2">
+                                {/* Report Header Card */}
+                                <div className="bg-white border border-slate-200/80 p-5 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                    <div>
+                                        <h2 className="text-base font-extrabold text-slate-900">LegalSimplify Analysis Report</h2>
+                                        <p className="text-xs text-slate-500 mt-1 font-medium">
+                                            Document: <span className="font-bold text-slate-800">{activeDocumentName || "Simplified Contract"}</span>
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                            Generated: {new Date().toLocaleString()}
+                                        </p>
+                                    </div>
+                                    <div className="text-xs font-bold text-blue-600 bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-md uppercase tracking-wider">
+                                        Simplified Output
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 text-blue-600" />
+                                        Analysis Results
+                                    </h2>
+                                    {uploading && (
+                                        <span className="text-[10px] text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-100 font-semibold animate-pulse">
+                                            Simplifying clauses...
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Risk Analysis warning panel */}
+                                {risks.length > 0 && (
+                                    <div className="space-y-3 bg-red-50/30 p-5 border border-red-200/60 rounded-lg animate-fade-in pdf-avoid-break">
+                                        <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
+                                            <AlertTriangle className="w-4 h-4 text-red-600 animate-bounce" />
+                                            Risk & Redline Findings
+                                        </h3>
+                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                                            Our AI detected the following potential legal risks and warning flags in this contract. Please review them carefully.
+                                        </p>
+                                        <div className="grid grid-cols-1 gap-3 mt-2">
+                                            {risks.map((risk, idx) => {
+                                                const isHigh = risk.severity.toLowerCase() === "high";
+                                                const isMedium = risk.severity.toLowerCase() === "medium";
+                                                const bgClass = isHigh ? "bg-red-50 border-red-200" : isMedium ? "bg-amber-50 border-amber-200" : "bg-blue-50 border-blue-200";
+                                                const textClass = isHigh ? "text-red-800" : isMedium ? "text-amber-800" : "text-blue-800";
+                                                const label = isHigh ? "High Severity" : isMedium ? "Medium Severity" : "Low Severity";
+
+                                                return (
+                                                    <Card key={idx} className={`p-4 border shadow-sm rounded-lg ${bgClass} flex flex-col gap-2`}>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs font-bold text-slate-800">
+                                                                {risk.clause}
+                                                            </span>
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm ${textClass}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isHigh ? "bg-red-600 animate-pulse" : isMedium ? "bg-amber-500 animate-pulse" : "bg-blue-500"}`} />
+                                                                {label}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-xs text-slate-700 leading-relaxed font-medium">
+                                                            <strong className="text-slate-900 block mb-0.5">Identified Risk:</strong>
+                                                            {risk.risk}
+                                                        </div>
+                                                        <div className="text-xs text-slate-700 leading-relaxed font-medium bg-white/70 p-2.5 rounded border border-black/5 mt-1">
+                                                            <strong className="text-blue-700 block mb-0.5">Recommendation:</strong>
+                                                            {risk.recommendation}
+                                                        </div>
+                                                    </Card>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="space-y-4 animate-fade-in">
+                                    {analysisResults.map((result, index) => (
+                                        <div key={index} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg pdf-avoid-break">
+                                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                                                <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
+                                                Section {result.section || index + 1}
+                                            </h3>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Original Clause Card */}
+                                                <Card className="bg-slate-50 border border-slate-200 p-4 shadow-sm rounded-md">
+                                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Original Text</p>
+                                                    <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                                        {result.original}
+                                                    </p>
+                                                </Card>
+
+                                                {/* Simplified Clause Card */}
+                                                <Card className="bg-blue-50/60 border border-blue-200 p-4 shadow-sm rounded-md">
+                                                    <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">Simplified Summary</p>
+                                                    <div
+                                                        className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap"
+                                                        dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(result.summary) }}
+                                                    />
+                                                </Card>
+                                            </div>
+
+                                            {result.legalTerms && result.legalTerms.length > 0 && (
+                                                <div className="mt-2 pt-3 border-t border-slate-100 space-y-2">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key Terms</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {result.legalTerms.map((term, termIndex) => (
+                                                            <div
+                                                                key={termIndex}
+                                                                className="text-xs bg-slate-50 border border-slate-200 rounded p-2.5 max-w-md shadow-sm"
+                                                            >
+                                                                <strong className="text-slate-800 font-semibold">{term.term}</strong>
+                                                                <span className="text-slate-500 block mt-0.5 leading-relaxed text-[11px]">
+                                                                    {term.definition}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
+
+            {/* --- FLOATING Q&A CHATBOT --- */}
+            {(analyzedDocId || activeAnalysisId) && (
+                <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
+                    {/* Chat Panel / Drawer */}
+                    {isChatOpen && (
+                        <Card className="w-96 h-[500px] mb-4 bg-white border border-slate-200/80 shadow-2xl rounded-xl flex flex-col overflow-hidden animate-slide-in-up">
+                            {/* Header */}
+                            <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                                    <div>
+                                        <h3 className="text-xs font-bold tracking-tight">Contract Assistant</h3>
+                                        <p className="text-[10px] text-slate-400 truncate max-w-[200px] font-medium mt-0.5">
+                                            {activeDocumentName || "Document"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setIsChatOpen(false)}
+                                    className="text-slate-400 hover:text-white transition-colors"
+                                    aria-label="Close chat"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Messages List */}
+                            <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
+                                {chatMessages.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                                        <div className="w-10 h-10 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-2">
+                                            <MessageSquare className="w-5 h-5 text-blue-600" />
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-700">Ask about this contract</p>
+                                        <p className="text-[10px] text-slate-500 mt-1 max-w-[200px] font-medium">
+                                            Ask questions about clauses, obligations, liabilities, or deadlines.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    chatMessages.map((msg, idx) => {
+                                        const isUser = msg.sender === "user";
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                            >
+                                                <div
+                                                    className={`max-w-[80%] rounded-lg p-3 text-xs leading-relaxed shadow-sm font-medium ${isUser
+                                                            ? "bg-blue-600 text-white rounded-br-none"
+                                                            : "bg-white border border-slate-200 text-slate-800 rounded-bl-none"
+                                                        }`}
+                                                >
+                                                    {msg.text}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                                {sendingChat && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-white border border-slate-200 rounded-lg rounded-bl-none p-3 shadow-sm flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" />
+                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100" />
+                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Input Footer */}
+                            <div className="p-3 border-t border-slate-100 bg-white">
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleSendChatMessage();
+                                    }}
+                                    className="flex gap-2"
+                                >
+                                    <Input
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        placeholder="Ask a question..."
+                                        className="text-xs h-9 bg-slate-50 border-slate-200 focus:bg-white"
+                                        disabled={sendingChat}
+                                    />
+                                    <Button
+                                        type="submit"
+                                        size="icon"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-9 w-9"
+                                        disabled={sendingChat || !chatInput.trim()}
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                    </Button>
+                                </form>
+                            </div>
+                        </Card>
+                    )}
+
+                    {/* Floating Action Button */}
+                    <button
+                        onClick={() => setIsChatOpen(!isChatOpen)}
+                        aria-label="Toggle chat"
+                        className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition-all hover:scale-105 active:scale-95 z-50 animate-bounce"
+                    >
+                        {isChatOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+                    </button>
+                </div>
+            )}
+
+            {/* Scroll-to-bottom button — only when results are visible and not at bottom */}
+            {analysisResults.length > 0 && showScrollBtn && (
+                <button
+                    onClick={scrollToBottom}
+                    aria-label="Scroll to bottom"
+                    className={`fixed bottom-6 ${analyzedDocId || activeAnalysisId ? "right-24" : "right-6"} z-50 w-10 h-10 rounded-full bg-slate-800/80 text-white flex items-center justify-center shadow-lg hover:bg-slate-700 transition-all hover:scale-105 active:scale-95 backdrop-blur-sm`}
+                >
+                    <ChevronRight className="w-4 h-4 rotate-90" />
+                </button>
+            )}
+            {/* --- MOBILE NAVIGATION DRAWER --- */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 bg-white z-50 flex flex-col p-6 overflow-y-auto animate-fade-in md:hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-6 border-b border-slate-100">
                         <Logo />
+                        <button
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="w-10 h-10 border border-slate-200 hover:border-slate-350 rounded-xl bg-white flex items-center justify-center transition-all active:scale-95 text-slate-500 hover:text-slate-800"
+                            aria-label="Close menu"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
 
-                    <div className="mb-6 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+                    {/* User Greeting Card */}
+                    <div className="mt-4 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
                         <h2 className="text-sm font-bold text-slate-800 tracking-tight truncate">
                             Hello, {userName}
                         </h2>
@@ -641,485 +1276,137 @@ export default function Dashboard() {
                         </p>
                     </div>
 
-                    <div className="flex justify-between items-center mb-3 pl-1 pr-1">
-                        <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                            Your History
-                        </h3>
-                        {history.length > 0 && (
-                            <div className="flex items-center gap-1.5">
-                                <input
-                                    type="checkbox"
-                                    id="select-all-history"
-                                    aria-label="Select all documents"
-                                    checked={history.length > 0 && selectedIds.length === history.length}
-                                    onChange={(e) => {
-                                        if (e.target.checked) {
-                                            setSelectedIds(history.map(item => item.id));
-                                        } else {
-                                            setSelectedIds([]);
-                                        }
-                                    }}
-                                    className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                />
-                                <label htmlFor="select-all-history" className="text-[10px] font-semibold text-slate-500 cursor-pointer select-none">
-                                    Select All
-                                </label>
-                            </div>
-                        )}
+                    {/* Nav Links */}
+                    <div className="mt-6 space-y-3">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="w-full text-left px-4 py-3 bg-teal-850 hover:bg-teal-900 text-white font-bold text-sm rounded-lg transition-all shadow-sm"
+                        >
+                            Dashboard
+                        </button>
+                        <button
+                            onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                navigate("/glossary");
+                            }}
+                            className="w-full text-left px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-lg transition-all"
+                        >
+                            Jargon Library
+                        </button>
                     </div>
 
-                    {selectedIds.length > 0 && (
-                        <div className="mb-3 px-1">
-                            <Button
-                                variant="destructive"
-                                size="sm"
-                                className="w-full text-xs font-semibold h-8 rounded-md flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                                onClick={handleDeleteSelected}
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                Delete Selected ({selectedIds.length})
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Scrollable list container */}
-                    <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2">
-                        {loadingHistory ? (
-                            <div className="space-y-2">
-                                {[...Array(4)].map((_, i) => (
-                                    <div key={i} className="p-3 bg-white border border-slate-200 rounded-lg flex items-center gap-2.5 shadow-sm">
-                                        <div className="w-4 h-4 rounded bg-slate-200 animate-pulse shrink-0" />
-                                        <div className="flex-1 space-y-1.5">
-                                            <div className="h-3 bg-slate-200 rounded animate-pulse w-3/4" />
-                                            <div className="h-2.5 bg-slate-200 rounded animate-pulse w-1/2" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : history.length > 0 ? (
-                            history.map((item) => (
-                                <div
-                                    key={item.id}
-                                    data-testid={`history-item-${item.id}`}
-                                    className="p-3 bg-white border border-slate-200 rounded-lg hover:border-blue-500/30 hover:bg-slate-50 cursor-pointer flex items-center transition-all group shadow-sm gap-2.5"
-                                    onClick={() => navigate(`/history/${item.id}`)}
-                                >
+                    {/* History List section in Mobile Drawer */}
+                    <div className="mt-8 flex-1 flex flex-col min-h-0">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Your History
+                            </h3>
+                            {history.length > 0 && (
+                                <div className="flex items-center gap-1.5">
                                     <input
                                         type="checkbox"
-                                        checked={selectedIds.includes(item.id)}
-                                        onClick={(e) => e.stopPropagation()}
+                                        id="mobile-select-all-history"
+                                        aria-label="Select all documents"
+                                        checked={history.length > 0 && selectedIds.length === history.length}
                                         onChange={(e) => {
                                             if (e.target.checked) {
-                                                setSelectedIds((prev) => [...prev, item.id]);
+                                                setSelectedIds(history.map(item => item.id));
                                             } else {
-                                                setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+                                                setSelectedIds([]);
                                             }
                                         }}
-                                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                                        className="w-3.5 h-3.5 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-semibold text-slate-700 truncate group-hover:text-blue-600 transition-colors">
-                                            {item.filename}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                                            {new Date(item.createdAt).toLocaleString()}
-                                        </p>
-                                    </div>
+                                    <label htmlFor="mobile-select-all-history" className="text-[10px] font-semibold text-slate-500 cursor-pointer select-none">
+                                        Select All
+                                    </label>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
-                                No history yet.
+                            )}
+                        </div>
+
+                        {selectedIds.length > 0 && (
+                            <div className="mb-3">
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    className="w-full text-xs font-semibold h-8 rounded-md flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                                    onClick={handleDeleteSelected}
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    Delete Selected ({selectedIds.length})
+                                </Button>
                             </div>
                         )}
+
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[300px]">
+                            {loadingHistory ? (
+                                <div className="space-y-2">
+                                    {[...Array(3)].map((_, i) => (
+                                        <div key={i} className="p-3 bg-white border border-slate-200 rounded-lg flex items-center gap-2.5 shadow-sm">
+                                            <div className="w-4 h-4 rounded bg-slate-200 animate-pulse shrink-0" />
+                                            <div className="flex-1 space-y-1.5">
+                                                <div className="h-3 bg-slate-200 rounded animate-pulse w-3/4" />
+                                                <div className="h-2.5 bg-slate-200 rounded animate-pulse w-1/2" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : history.length > 0 ? (
+                                history.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="p-3 bg-white border border-slate-200 rounded-lg flex items-center shadow-sm gap-2.5"
+                                        onClick={() => {
+                                            setIsMobileMenuOpen(false);
+                                            navigate(`/history/${item.id}`);
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.includes(item.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    setSelectedIds((prev) => [...prev, item.id]);
+                                                } else {
+                                                    setSelectedIds((prev) => prev.filter((id) => id !== item.id));
+                                                }
+                                            }}
+                                            className="w-4 h-4 rounded border-slate-350 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-semibold text-slate-700 truncate">
+                                                {item.filename}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                                                {new Date(item.createdAt).toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="py-6 text-center text-xs text-slate-400 bg-white rounded-lg border border-dashed border-slate-200">
+                                    No history yet.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Logout Button */}
+                    <div className="mt-auto pt-6 border-t border-slate-100">
+                        <button
+                            onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                handleSignOut();
+                            }}
+                            className="w-full py-3 border-2 border-teal-800 hover:bg-teal-50 text-teal-850 font-bold text-sm rounded-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Logout
+                        </button>
                     </div>
                 </div>
-            </aside>
-
-            {/* --- MAIN CONTENT --- */}
-            <main
-                className="flex-1 flex flex-col bg-slate-50/50"
-            >
-                <div className="max-w-5xl w-full mx-auto px-6 py-8 space-y-6">
-                    {/* Header bar */}
-                    <header className="flex justify-between items-center pb-4 border-b border-slate-200/60">
-                        <div>
-                            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                                LegalSimplify Studio
-                            </h1>
-                            <p className="text-xs text-slate-500 mt-0.5">
-                                Convert raw legalese to plain language instantly.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
-                                onClick={() => navigate("/glossary")}
-                            >
-                                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                                Jargon Library
-                            </Button>
-                            {analysisResults.length > 0 && !uploading && (
-                                <Button
-                                    variant="outline"
-                                    className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
-                                    onClick={handleExportPDF}
-                                    disabled={isExportingPDF}
-                                >
-                                    {isExportingPDF ? (
-                                        <>
-                                            <div className="w-3.5 h-3.5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                                            Exporting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download className="w-3.5 h-3.5 text-emerald-600" />
-                                            Export PDF
-                                        </>
-                                    )}
-                                </Button>
-                            )}
-                            <Button
-                                variant="outline"
-                                className="bg-white border-slate-300 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
-                                onClick={handleSignOut}
-                            >
-                                <LogOut className="w-3.5 h-3.5" />
-                                Logout
-                            </Button>
-                        </div>
-                    </header>
-
-                    {/* Upload Card */}
-                    <Card className="bg-white border border-slate-200/80 p-6 shadow-sm rounded-lg space-y-5">
-                        <div className="space-y-5">
-                            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                                <UploadCloud className="w-4 h-4 text-blue-600" />
-                                Upload Your Legal Document
-                            </h2>
-
-                            {/* Dropzone container */}
-                            <div className="relative border border-dashed border-slate-300 hover:border-blue-500/50 rounded-lg p-5 flex flex-col items-center justify-center bg-slate-50/50 cursor-pointer transition-all hover:bg-slate-50 group">
-                                <Label htmlFor="file-upload" className="absolute inset-0 cursor-pointer w-full h-full" />
-                                <Input
-                                    id="file-upload"
-                                    type="file"
-                                    accept=".pdf,.docx,.txt"
-                                    onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                    className="hidden"
-                                    aria-label="Select a file"
-                                />
-                                <div className="space-y-2 text-center pointer-events-none">
-                                    <div className="w-10 h-10 mx-auto rounded-full bg-blue-50 flex items-center justify-center">
-                                        <FileText className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <div className="text-xs">
-                                        {file ? (
-                                            <span className="font-semibold text-blue-800 truncate max-w-xs block mx-auto">{file.name}</span>
-                                        ) : (
-                                            <span className="text-slate-500 font-semibold">Select a file (.pdf, .docx, .txt)</span>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-slate-400">
-                                        {file ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : "Max file size: 10MB"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Language Selector */}
-                            <div className="space-y-1.5">
-                                <Label htmlFor="output-language" className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                                    <Globe className="w-3.5 h-3.5 text-blue-600" />
-                                    Output Translation Language
-                                </Label>
-                                <select
-                                    id="output-language"
-                                    aria-label="Output Language"
-                                    value={language}
-                                    onChange={(e) => setLanguage(e.target.value)}
-                                    className="w-full h-10 px-3 border rounded-md bg-white border-slate-300 text-slate-700 text-xs focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                                >
-                                    <option value="en">English (Default)</option>
-                                    <option value="hi">Hindi (हिंदी)</option>
-                                    <option value="kn">Kannada (ಕನ್ನಡ)</option>
-                                    <option value="ta">Tamil (தமிழ்)</option>
-                                    <option value="te">Telugu (తెలుగు)</option>
-                                    <option value="es">Spanish (Español)</option>
-                                    <option value="fr">French (Français)</option>
-                                </select>
-                            </div>
-
-                            {/* Submit / Stop Buttons */}
-                            {!uploading ? (
-                                <Button
-                                    data-testid="upload-button"
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition-all h-10 shadow-sm"
-                                    onClick={handleUpload}
-                                    disabled={!file}
-                                >
-                                    Upload & Simplify
-                                </Button>
-                            ) : (
-                                <Button
-                                    className="w-full border border-red-300 hover:border-red-400 bg-transparent hover:bg-red-50/30 text-red-600 font-semibold rounded-md transition-all h-10 shadow-sm gap-2"
-                                    onClick={handleStop}
-                                >
-                                    <AlertCircle className="w-4 h-4 animate-pulse" />
-                                    Stop Processing
-                                </Button>
-                            )}
-                        </div>
-                    </Card>
-
-                    {/* --- RESULTS SECTION --- */}
-                    {analysisResults.length > 0 && (
-                        <div id="pdf-report-content" className="space-y-4 pt-2">
-                            {/* Report Header Card */}
-                            <div className="bg-white border border-slate-200/80 p-5 rounded-lg shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                <div>
-                                    <h2 className="text-base font-extrabold text-slate-900">LegalSimplify Analysis Report</h2>
-                                    <p className="text-xs text-slate-500 mt-1 font-medium">
-                                        Document: <span className="font-bold text-slate-800">{activeDocumentName || "Simplified Contract"}</span>
-                                    </p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
-                                        Generated: {new Date().toLocaleString()}
-                                    </p>
-                                </div>
-                                <div className="text-xs font-bold text-blue-600 bg-blue-50/50 border border-blue-100 px-3 py-1.5 rounded-md uppercase tracking-wider">
-                                    Simplified Output
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4 text-blue-600" />
-                                    Analysis Results
-                                </h2>
-                                {uploading && (
-                                    <span className="text-[10px] text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-100 font-semibold animate-pulse">
-                                        Simplifying clauses...
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Risk Analysis warning panel */}
-                            {risks.length > 0 && (
-                                <div className="space-y-3 bg-red-50/30 p-5 border border-red-200/60 rounded-lg animate-fade-in">
-                                    <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
-                                        <AlertTriangle className="w-4 h-4 text-red-600 animate-bounce" />
-                                        Risk & Redline Findings
-                                    </h3>
-                                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                                        Our AI detected the following potential legal risks and warning flags in this contract. Please review them carefully.
-                                    </p>
-                                    <div className="grid grid-cols-1 gap-3 mt-2">
-                                        {risks.map((risk, idx) => {
-                                            const isHigh = risk.severity.toLowerCase() === "high";
-                                            const isMedium = risk.severity.toLowerCase() === "medium";
-                                            const bgClass = isHigh ? "bg-red-50 border-red-200" : isMedium ? "bg-amber-50 border-amber-200" : "bg-blue-50 border-blue-200";
-                                            const textClass = isHigh ? "text-red-800" : isMedium ? "text-amber-800" : "text-blue-800";
-                                            const label = isHigh ? "High Severity" : isMedium ? "Medium Severity" : "Low Severity";
-                                            
-                                            return (
-                                                <Card key={idx} className={`p-4 border shadow-sm rounded-lg ${bgClass} flex flex-col gap-2`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-xs font-bold text-slate-800">
-                                                            {risk.clause}
-                                                        </span>
-                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm ${textClass}`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${isHigh ? "bg-red-600 animate-pulse" : isMedium ? "bg-amber-500 animate-pulse" : "bg-blue-500"}`} />
-                                                            {label}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-xs text-slate-700 leading-relaxed font-medium">
-                                                        <strong className="text-slate-900 block mb-0.5">Identified Risk:</strong>
-                                                        {risk.risk}
-                                                    </div>
-                                                    <div className="text-xs text-slate-700 leading-relaxed font-medium bg-white/70 p-2.5 rounded border border-black/5 mt-1">
-                                                        <strong className="text-blue-700 block mb-0.5">Recommendation:</strong>
-                                                        {risk.recommendation}
-                                                    </div>
-                                                </Card>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="space-y-4 animate-fade-in">
-                                {analysisResults.map((result, index) => (
-                                    <div key={index} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg">
-                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                                            <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
-                                            Section {result.section || index + 1}
-                                        </h3>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {/* Original Clause Card */}
-                                            <Card className="bg-slate-50 border border-slate-200 p-4 shadow-sm rounded-md">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Original Text</p>
-                                                <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                                    {result.original}
-                                                </p>
-                                            </Card>
-
-                                            {/* Simplified Clause Card */}
-                                            <Card className="bg-blue-50/60 border border-blue-200 p-4 shadow-sm rounded-md">
-                                                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-2">Simplified Summary</p>
-                                                <div 
-                                                    className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap"
-                                                    dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(result.summary) }}
-                                                />
-                                            </Card>
-                                        </div>
-
-                                        {result.legalTerms && result.legalTerms.length > 0 && (
-                                            <div className="mt-2 pt-3 border-t border-slate-100 space-y-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Key Legal Terms</p>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {result.legalTerms.map((term, termIndex) => (
-                                                        <div
-                                                            key={termIndex}
-                                                            className="text-xs bg-slate-50 border border-slate-200 rounded p-2.5 max-w-md shadow-sm"
-                                                        >
-                                                            <strong className="text-slate-800 font-semibold">{term.term}</strong>
-                                                            <span className="text-slate-500 block mt-0.5 leading-relaxed text-[11px]">
-                                                                {term.definition}
-                                                            </span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
-        </div>
-
-        {/* --- FLOATING Q&A CHATBOT --- */}
-        {(analyzedDocId || activeAnalysisId) && (
-            <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
-                {/* Chat Panel / Drawer */}
-                {isChatOpen && (
-                    <Card className="w-96 h-[500px] mb-4 bg-white border border-slate-200/80 shadow-2xl rounded-xl flex flex-col overflow-hidden animate-slide-in-up">
-                        {/* Header */}
-                        <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <MessageSquare className="w-4 h-4 text-blue-400" />
-                                <div>
-                                    <h3 className="text-xs font-bold tracking-tight">Contract Assistant</h3>
-                                    <p className="text-[10px] text-slate-400 truncate max-w-[200px] font-medium mt-0.5">
-                                        {activeDocumentName || "Document"}
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setIsChatOpen(false)}
-                                className="text-slate-400 hover:text-white transition-colors"
-                                aria-label="Close chat"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Messages List */}
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3">
-                            {chatMessages.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                                    <div className="w-10 h-10 mx-auto rounded-full bg-blue-50 flex items-center justify-center mb-2">
-                                        <MessageSquare className="w-5 h-5 text-blue-600" />
-                                    </div>
-                                    <p className="text-xs font-bold text-slate-700">Ask about this contract</p>
-                                    <p className="text-[10px] text-slate-500 mt-1 max-w-[200px] font-medium">
-                                        Ask questions about clauses, obligations, liabilities, or deadlines.
-                                    </p>
-                                </div>
-                            ) : (
-                                chatMessages.map((msg, idx) => {
-                                    const isUser = msg.sender === "user";
-                                    return (
-                                        <div
-                                            key={idx}
-                                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                        >
-                                            <div
-                                                className={`max-w-[80%] rounded-lg p-3 text-xs leading-relaxed shadow-sm font-medium ${
-                                                    isUser
-                                                        ? "bg-blue-600 text-white rounded-br-none"
-                                                        : "bg-white border border-slate-200 text-slate-800 rounded-bl-none"
-                                                }`}
-                                            >
-                                                {msg.text}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                            {sendingChat && (
-                                <div className="flex justify-start">
-                                    <div className="bg-white border border-slate-200 rounded-lg rounded-bl-none p-3 shadow-sm flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce" />
-                                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100" />
-                                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200" />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Input Footer */}
-                        <div className="p-3 border-t border-slate-100 bg-white">
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    handleSendChatMessage();
-                                }}
-                                className="flex gap-2"
-                            >
-                                <Input
-                                    value={chatInput}
-                                    onChange={(e) => setChatInput(e.target.value)}
-                                    placeholder="Ask a question..."
-                                    className="text-xs h-9 bg-slate-50 border-slate-200 focus:bg-white"
-                                    disabled={sendingChat}
-                                />
-                                <Button
-                                    type="submit"
-                                    size="icon"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 h-9 w-9"
-                                    disabled={sendingChat || !chatInput.trim()}
-                                >
-                                    <Send className="w-3.5 h-3.5" />
-                                </Button>
-                            </form>
-                        </div>
-                    </Card>
-                )}
-
-                {/* Floating Action Button */}
-                <button
-                    onClick={() => setIsChatOpen(!isChatOpen)}
-                    aria-label="Toggle chat"
-                    className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg hover:bg-blue-700 transition-all hover:scale-105 active:scale-95 z-50 animate-bounce"
-                >
-                    {isChatOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-                </button>
-            </div>
-        )}
-
-        {/* Scroll-to-bottom button — only when results are visible and not at bottom */}
-        {analysisResults.length > 0 && showScrollBtn && (
-            <button
-                onClick={scrollToBottom}
-                aria-label="Scroll to bottom"
-                className={`fixed bottom-6 ${analyzedDocId || activeAnalysisId ? "right-24" : "right-6"} z-50 w-10 h-10 rounded-full bg-slate-800/80 text-white flex items-center justify-center shadow-lg hover:bg-slate-700 transition-all hover:scale-105 active:scale-95 backdrop-blur-sm`}
-            >
-                <ChevronRight className="w-4 h-4 rotate-90" />
-            </button>
-        )}
+            )}
         </>
     );
 }

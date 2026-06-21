@@ -27,8 +27,9 @@ const corsOptions = {
         
         const isVercelPreview = /\.vercel\.app$/.test(origin);
         const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+        const isLocalConnection = /^http:\/\/(?:localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)(?::\d+)?$/.test(origin);
         
-        if (allowedOrigins.indexOf(origin) !== -1 || isLocalhost || isVercelPreview) {
+        if (allowedOrigins.indexOf(origin) !== -1 || isLocalhost || isVercelPreview || isLocalConnection) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
@@ -68,5 +69,14 @@ const historyRouter = require("./features/history/routes/historyRoutes");
 
 app.use("/upload", uploadLimiter, uploadRouter);
 app.use("/history", historyRouter);
+
+// Unhandled errors global handler (prevents stack traces from leaking in production)
+app.use((err, req, res, next) => {
+    if (res.headersSent) {
+        return next(err);
+    }
+    console.error("Unhandled server exception:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+});
 
 module.exports = app;

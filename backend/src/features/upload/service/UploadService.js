@@ -26,8 +26,8 @@ async function processContractInBackground(analysisId, text, lang) {
                 console.warn(`[UploadService] Document not found for heartbeat: ${analysisId}. Aborting.`);
                 return;
             }
-            if (doc.status === "failed") {
-                console.warn(`[UploadService] Job marked as failed: ${analysisId}. Aborting.`);
+            if (doc.status === "completed" || doc.status === "failed") {
+                console.warn(`[UploadService] Job marked as completed or failed: ${analysisId}. Aborting.`);
                 return;
             }
 
@@ -71,7 +71,7 @@ async function processContractInBackground(analysisId, text, lang) {
                 legalTerms: sectionTerms,
             };
 
-            await AnalysisRepository.pushSection(analysisId, sectionData);
+            await AnalysisRepository.pushSection(analysisId, sectionData, mainGlossary);
         }
 
         // Analyze legal risks/redlines using Gemini
@@ -90,6 +90,10 @@ async function handleUpload(req, res) {
         const user = await getUserFromToken(req);
         if (!user) return res.status(401).json({ error: "Invalid Supabase token" });
         const userId = user.id;
+        const username = user.user_metadata?.first_name ||
+                         user.user_metadata?.full_name?.split(" ")[0] ||
+                         user.email?.split("@")[0] ||
+                         "User";
 
         const lang = req.query.lang || "en";
         if (!req.file) return res.status(400).json({ error: "No file provided." });
@@ -101,6 +105,7 @@ async function handleUpload(req, res) {
 
         const newAnalysis = await AnalysisRepository.create({
             userId,
+            username,
             filename: req.file.originalname,
             status: "processing",
             mimeType: req.file.mimetype,

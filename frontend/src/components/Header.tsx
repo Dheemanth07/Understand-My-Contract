@@ -11,10 +11,10 @@ export default function Header() {
                 <Logo />
 
                 {/* Right Side: Navigation Links */}
-                <nav className="flex items-center space-x-6">
+                <nav className="flex items-center space-x-3 sm:space-x-6">
                     <Link
                         to="/signin"
-                        className="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-200"
+                        className="hidden sm:inline-block text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-200"
                     >
                         Sign In
                     </Link>
@@ -22,7 +22,7 @@ export default function Header() {
                         to="/signup"
                         className="inline-flex"
                     >
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 transition-all duration-200 rounded-md">
+                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 sm:px-4 transition-all duration-200 rounded-md text-xs sm:text-sm">
                             Get Started
                         </Button>
                     </Link>

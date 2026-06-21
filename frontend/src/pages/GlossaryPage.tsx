@@ -59,21 +59,21 @@ export default function GlossaryPage() {
     });
 
     return (
-        <div className="min-h-screen bg-slate-50 text-slate-700 font-sans pb-16">
+        <div className="min-h-screen bg-slate-50 text-slate-700 font-sans pb-16 relative isolate">
             <div className="max-w-5xl mx-auto px-6 pt-8 space-y-6">
                 
                 {/* --- HEADER --- */}
-                <header className="flex justify-between items-center pb-4 border-b border-slate-200/60">
-                    <div className="flex items-center gap-3">
+                <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
                         <Logo />
-                        <div className="h-6 w-px bg-slate-300" />
+                        <div className="h-8 w-px bg-slate-200 hidden sm:block" />
                         <div>
                             <h1 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-1.5">
                                 <BookOpen className="w-4 h-4 text-blue-600" />
                                 Jargon Library
                             </h1>
                             <p className="text-xs text-slate-500 mt-0.5">
-                                Your personal dictionary of legal definitions compiled across all contracts.
+                                Your personal dictionary of terms and definitions compiled across all uploaded documents.
                             </p>
                         </div>
                     </div>
@@ -92,10 +92,10 @@ export default function GlossaryPage() {
                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <Input
                         type="text"
-                        placeholder="Search legal terms or definitions..."
+                        placeholder="Search terms or definitions..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 h-10 bg-white border border-slate-200/80 shadow-sm focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-lg text-xs"
+                        className="pl-10 h-10 bg-white border border-slate-200 shadow-sm focus-visible:ring-blue-500 focus-visible:border-blue-500 rounded-lg text-xs"
                     />
                 </div>
 
@@ -131,16 +131,16 @@ export default function GlossaryPage() {
                 ) : Object.keys(glossary).length === 0 ? (
                     <Card className="p-8 text-center bg-white border border-slate-200 shadow-sm rounded-lg">
                         <BookOpen className="w-8 h-8 text-slate-350 mx-auto mb-2" />
-                        <p className="text-slate-500 font-semibold text-sm">No legal terms found yet.</p>
+                        <p className="text-slate-500 font-semibold text-sm">No terms found yet.</p>
                         <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                            Upload your first contract on the dashboard. Any legal terms and corporate definitions found will be listed here automatically.
+                            Upload your first document on the dashboard. Any complex terms and definitions found will be listed here automatically.
                         </p>
                     </Card>
                 ) : filteredTerms.length === 0 ? (
                     <Card className="p-8 text-center bg-white border border-slate-200 shadow-sm rounded-lg">
                         <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         <p className="text-slate-500 font-semibold text-sm">No terms match your search.</p>
-                        <p className="text-xs text-slate-400 mt-1">Try searching another keyword or legal jargon word.</p>
+                        <p className="text-xs text-slate-400 mt-1">Try searching another keyword or jargon word.</p>
                     </Card>
                 ) : (
                     <div className="space-y-8">
@@ -149,14 +149,14 @@ export default function GlossaryPage() {
                             .map((letter) => (
                                 <div key={letter} className="space-y-3">
                                     <div className="flex items-center gap-3">
-                                        <h2 className="text-sm font-extrabold text-blue-700 bg-blue-50/50 border border-blue-100/50 w-7 h-7 rounded-full flex items-center justify-center">
+                                        <h2 className="text-sm font-extrabold text-blue-700 bg-blue-50 border border-blue-100 w-7 h-7 rounded-full flex items-center justify-center">
                                             {letter}
                                         </h2>
-                                        <div className="h-px bg-slate-200/80 flex-1" />
+                                        <div className="h-px bg-slate-200 flex-1" />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {groupedTerms[letter].map(([term, definition]) => (
-                                            <Card key={term} className="bg-white border border-slate-200/80 p-4 shadow-sm rounded-lg hover:border-blue-500/20 transition-all space-y-1">
+                                            <Card key={term} className="bg-white border border-slate-200 p-4 shadow-sm rounded-lg hover:border-blue-500/20 transition-all space-y-1">
                                                 <div className="flex items-center gap-1.5">
                                                     <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                                     <strong className="text-xs font-semibold text-slate-800 tracking-tight">

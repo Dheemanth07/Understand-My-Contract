@@ -121,15 +121,35 @@ async function getMergedGlossary(req, res) {
 
         const docs = await AnalysisRepository.getUserGlossaries(user.id);
         const merged = {};
+        const termMap = new Map(); // lowercaseTerm -> { originalTerm, definition }
+
         for (const doc of docs) {
             if (doc.glossary) {
                 Object.entries(doc.glossary).forEach(([term, definition]) => {
                     if (definition && definition !== '(Definition not found)') {
-                        merged[term] = definition;
+                        const trimmed = term.trim();
+                        const lower = trimmed.toLowerCase();
+
+                        if (!termMap.has(lower)) {
+                            termMap.set(lower, { term: trimmed, definition });
+                        } else {
+                            // If the existing term is all-uppercase (e.g. REGULATION) but the new one is not, prefer the new one's casing
+                            const existing = termMap.get(lower);
+                            const isExistingAllUpper = existing.term === existing.term.toUpperCase();
+                            const isNewAllUpper = trimmed === trimmed.toUpperCase();
+                            if (isExistingAllUpper && !isNewAllUpper) {
+                                termMap.set(lower, { term: trimmed, definition });
+                            }
+                        }
                     }
                 });
             }
         }
+
+        for (const { term, definition } of termMap.values()) {
+            merged[term] = definition;
+        }
+
         res.json({ glossary: merged });
     } catch (err) {
         console.error("Failed to fetch merged glossary:", err);
@@ -137,5 +157,25 @@ async function getMergedGlossary(req, res) {
     }
 }
 
-module.exports = { list, getById, deleteById, chat, getMergedGlossary };
+async function stop(req, res) {
+    try {
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+
+        const { id } = req.params;
+        const doc = await AnalysisRepository.getById(id);
+        if (!doc || doc.userId !== user.id) return res.status(404).json({ error: "Document not found or access denied" });
+
+        if (doc.status === "processing") {
+            await AnalysisRepository.setCompleted(id, doc.glossary || {}, doc.risks || []);
+        }
+
+        res.status(200).json({ message: "Document processing stopped, partial analysis saved." });
+    } catch (err) {
+        console.error("Stop processing error:", err);
+        res.status(500).json({ error: "Failed to stop processing" });
+    }
+}
+
+module.exports = { list, getById, deleteById, chat, getMergedGlossary, stop };
 

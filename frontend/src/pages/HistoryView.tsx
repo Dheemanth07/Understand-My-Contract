@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { API_BASE_URL } from "@/config";
-import { ArrowLeft, Clock, FileText, Globe, Mail, ShieldAlert, ChevronRight, Download, BookOpen, AlertTriangle, MessageSquare, Send, X } from "lucide-react";
+import { ArrowLeft, Clock, FileText, Globe, Mail, ShieldAlert, ChevronRight, Download, BookOpen, AlertTriangle, MessageSquare, Send, X, Menu } from "lucide-react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import axios from "axios";
 import { useToast } from "@/hooks/use-toast";
 import { formatMarkdownToHtml } from "@/lib/utils";
+import Logo from "@/components/Logo";
 
 export default function HistoryView() {
     const { id } = useParams();
@@ -22,6 +23,12 @@ export default function HistoryView() {
     const [loading, setLoading] = useState(true);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
     const [showScrollBtn, setShowScrollBtn] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const userName = user?.user_metadata?.first_name ||
+        user?.user_metadata?.full_name?.split(" ")[0] ||
+        user?.email?.split("@")[0] ||
+        "User";
 
     // Chatbot state
     const [isChatOpen, setIsChatOpen] = useState(false);
@@ -50,177 +57,336 @@ export default function HistoryView() {
             // Ensure all fonts are fully loaded for perfect text shaping
             await document.fonts.ready;
 
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: "#f8fafc",
-                windowWidth: 1200, // Force standard desktop viewport width
-                onclone: (clonedDoc) => {
-                    // Hide header buttons/actions and ignored components in cloned DOM
-                    const ignoreSelectors = [
-                        "[data-html2canvas-ignore]",
-                        "button",
-                        "a",
-                        "select",
-                        "input",
-                        ".fixed",
-                        ".floating-actions",
-                        "header div.flex.items-center.gap-2.shrink-0",
-                        "header .flex.items-center.gap-2"
-                    ];
-                    ignoreSelectors.forEach((selector) => {
-                        clonedDoc.querySelectorAll(selector).forEach((el) => {
-                            (el as HTMLElement).style.setProperty("display", "none", "important");
-                        });
-                    });
+            // 1. Create temporary off-screen clone of the report container
+            const clonedElement = element.cloneNode(true) as HTMLElement;
+            clonedElement.id = "pdf-report-content-clone";
+            
+            clonedElement.style.position = "absolute";
+            clonedElement.style.left = "-9999px";
+            clonedElement.style.top = "0";
+            clonedElement.style.width = "1024px";
+            clonedElement.style.maxWidth = "1024px";
+            clonedElement.style.minWidth = "1024px";
+            clonedElement.style.background = "#f8fafc";
+            clonedElement.style.padding = "32px";
+            clonedElement.style.boxSizing = "border-box";
 
-                    // Force the report content element to use explicit desktop width
-                    const reportContent = clonedDoc.getElementById("pdf-report-content");
-                    if (reportContent) {
-                        reportContent.style.setProperty("width", "1024px", "important");
-                        reportContent.style.setProperty("max-width", "1024px", "important");
-                        reportContent.style.setProperty("min-width", "1024px", "important");
-                        reportContent.style.setProperty("margin", "0 auto", "important");
-                        reportContent.style.setProperty("padding", "32px", "important");
-                        reportContent.style.setProperty("box-sizing", "border-box", "important");
+            document.body.appendChild(clonedElement);
+
+            // 2. Hide ignored components in the clone
+            const ignoreSelectors = [
+                "[data-html2canvas-ignore]",
+                "button",
+                "a",
+                "select",
+                "input",
+                ".fixed",
+                ".floating-actions",
+                "header div.flex.items-center.gap-2.shrink-0",
+                "header .flex.items-center.gap-2"
+            ];
+            ignoreSelectors.forEach((selector) => {
+                clonedElement.querySelectorAll(selector).forEach((el) => {
+                    (el as HTMLElement).style.setProperty("display", "none", "important");
+                });
+            });
+
+            // 3. Fix truncation: remove overflow/clip/ellipsis on ALL elements
+            clonedElement.querySelectorAll("*").forEach((el) => {
+                const htmlEl = el as HTMLElement;
+                if (
+                    htmlEl.classList.contains("truncate") ||
+                    htmlEl.classList.contains("overflow-hidden") ||
+                    htmlEl.classList.contains("min-w-0")
+                ) {
+                    htmlEl.style.setProperty("overflow", "visible", "important");
+                    htmlEl.style.setProperty("text-overflow", "clip", "important");
+                    htmlEl.style.setProperty("white-space", "normal", "important");
+                }
+            });
+
+            // 4. Compact print spacing on header
+            const header = clonedElement.querySelector("header");
+            if (header) {
+                (header as HTMLElement).style.setProperty("padding-bottom", "16px", "important");
+                (header as HTMLElement).style.setProperty("margin-bottom", "8px", "important");
+                (header as HTMLElement).style.setProperty("display", "block", "important");
+            }
+            const h1 = clonedElement.querySelector("header h1");
+            if (h1) {
+                (h1 as HTMLElement).style.setProperty("white-space", "normal", "important");
+                (h1 as HTMLElement).style.setProperty("overflow", "visible", "important");
+                (h1 as HTMLElement).style.setProperty("text-overflow", "clip", "important");
+                (h1 as HTMLElement).style.setProperty("font-size", "22px", "important");
+                (h1 as HTMLElement).style.setProperty("margin-bottom", "8px", "important");
+                (h1 as HTMLElement).style.setProperty("line-height", "1.4", "important");
+                (h1 as HTMLElement).style.setProperty("word-break", "break-word", "important");
+                (h1 as HTMLElement).style.setProperty("padding-top", "6px", "important");
+                (h1 as HTMLElement).style.setProperty("padding-bottom", "6px", "important");
+            }
+            const headerTitleBlock = clonedElement.querySelector("header .space-y-1\\.5, header .space-y-1, header > div:first-child");
+            if (headerTitleBlock) {
+                (headerTitleBlock as HTMLElement).style.setProperty("max-width", "100%", "important");
+                (headerTitleBlock as HTMLElement).style.setProperty("width", "100%", "important");
+            }
+
+            // Make the h2/h3 titles wrap freely and have padding to prevent ascender/descender cropping
+            clonedElement.querySelectorAll("h2, h3").forEach((h) => {
+                const htmlEl = h as HTMLElement;
+                htmlEl.style.setProperty("white-space", "normal", "important");
+                htmlEl.style.setProperty("overflow", "visible", "important");
+                htmlEl.style.setProperty("text-overflow", "clip", "important");
+                htmlEl.style.setProperty("word-break", "break-word", "important");
+                htmlEl.style.setProperty("margin-top", "2px", "important");
+                htmlEl.style.setProperty("margin-bottom", "4px", "important");
+                htmlEl.style.setProperty("padding-top", "4px", "important");
+                htmlEl.style.setProperty("padding-bottom", "4px", "important");
+                htmlEl.style.setProperty("font-size", "14px", "important");
+            });
+
+            // 5. Card padding adjustments (compact styling for high print density)
+            clonedElement.querySelectorAll(".p-4").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "10px", "important");
+            });
+            clonedElement.querySelectorAll(".p-5").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "12px", "important");
+            });
+            clonedElement.querySelectorAll(".p-3").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "8px", "important");
+            });
+            clonedElement.querySelectorAll(".p-2\\.5, .p-2").forEach((el) => {
+                (el as HTMLElement).style.setProperty("padding", "6px", "important");
+            });
+
+            // Make original text, simplified summary, and key terms compact in PDF
+            clonedElement.querySelectorAll(".bg-slate-50, .bg-blue-50\\/60, .bg-white, card").forEach((card) => {
+                const htmlEl = card as HTMLElement;
+                htmlEl.querySelectorAll("p, li, div, span, strong").forEach((el) => {
+                    const child = el as HTMLElement;
+                    if (child.tagName !== "H1" && child.tagName !== "H2" && child.tagName !== "H3" && child.tagName !== "H4") {
+                        child.style.setProperty("font-size", "10px", "important");
+                        child.style.setProperty("line-height", "1.3", "important");
                     }
+                });
+            });
 
-                    // ── Fix truncation: remove any overflow/clip/ellipsis on ALL elements ──
-                    clonedDoc.querySelectorAll("*").forEach((el) => {
-                        const htmlEl = el as HTMLElement;
-                        if (
-                            htmlEl.classList.contains("truncate") ||
-                            htmlEl.classList.contains("overflow-hidden") ||
-                            htmlEl.classList.contains("min-w-0")
-                        ) {
-                            htmlEl.style.setProperty("overflow", "visible", "important");
-                            htmlEl.style.setProperty("text-overflow", "clip", "important");
-                            htmlEl.style.setProperty("white-space", "normal", "important");
-                        }
+            clonedElement.querySelectorAll("section").forEach((sec) => {
+                (sec as HTMLElement).style.setProperty("margin-bottom", "10px", "important");
+                (sec as HTMLElement).style.setProperty("padding-top", "2px", "important");
+            });
+
+            clonedElement.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
+                (card as HTMLElement).style.setProperty("margin-bottom", "10px", "important");
+                // Clear any manual margin-top applied previously
+                (card as HTMLElement).style.setProperty("margin-top", "0px", "important");
+            });
+
+            // 6. Convert Grid to Flex with wrap support
+            const grids = clonedElement.querySelectorAll(".grid");
+            grids.forEach((grid) => {
+                const el = grid as HTMLElement;
+                let cols = 1;
+                if (el.classList.contains("md:grid-cols-3") || el.classList.contains("grid-cols-3")) {
+                    cols = 3;
+                } else if (el.classList.contains("md:grid-cols-2") || el.classList.contains("grid-cols-2")) {
+                    cols = 2;
+                }
+
+                el.style.setProperty("display", "flex", "important");
+                el.style.setProperty("flex-direction", "row", "important");
+                el.style.setProperty("flex-wrap", "wrap", "important"); // Allow wrapping (highly important for glossary/many cards)
+                el.style.setProperty("gap", "12px", "important");
+                el.style.setProperty("width", "100%", "important");
+                el.style.setProperty("box-sizing", "border-box", "important");
+                el.style.setProperty("margin-bottom", "12px", "important");
+
+                const children = Array.from(el.children);
+                if (cols > 1 && children.length > 0) {
+                    const gapValue = 12; // 12px gap
+                    const widthCalc = `calc(${(100 / cols).toFixed(2)}% - ${((cols - 1) * gapValue / cols).toFixed(2)}px)`;
+                    children.forEach((child) => {
+                        const childEl = child as HTMLElement;
+                        childEl.style.setProperty("width", widthCalc, "important");
+                        childEl.style.setProperty("max-width", widthCalc, "important");
+                        childEl.style.setProperty("box-sizing", "border-box", "important");
+                        childEl.style.setProperty("display", "block", "important");
+                        childEl.style.setProperty("overflow", "visible", "important");
+                        childEl.style.setProperty("min-width", "0", "important");
                     });
-
-                    // ── Generous spacing on header ──
-                    const header = clonedDoc.querySelector("header");
-                    if (header) {
-                        (header as HTMLElement).style.setProperty("padding-bottom", "28px", "important");
-                        (header as HTMLElement).style.setProperty("margin-bottom", "12px", "important");
-                        (header as HTMLElement).style.setProperty("display", "block", "important");
-                    }
-                    // Make the title wrap freely and show in full
-                    const h1 = clonedDoc.querySelector("header h1");
-                    if (h1) {
-                        (h1 as HTMLElement).style.setProperty("white-space", "normal", "important");
-                        (h1 as HTMLElement).style.setProperty("overflow", "visible", "important");
-                        (h1 as HTMLElement).style.setProperty("text-overflow", "clip", "important");
-                        (h1 as HTMLElement).style.setProperty("font-size", "22px", "important");
-                        (h1 as HTMLElement).style.setProperty("margin-bottom", "8px", "important");
-                        (h1 as HTMLElement).style.setProperty("line-height", "1.4", "important");
-                        (h1 as HTMLElement).style.setProperty("word-break", "break-word", "important");
-                    }
-
-                    // ── Ensure the header text container fills width ──
-                    const headerTitleBlock = clonedDoc.querySelector("header .space-y-1\\.5, header .space-y-1, header > div:first-child");
-                    if (headerTitleBlock) {
-                        (headerTitleBlock as HTMLElement).style.setProperty("max-width", "100%", "important");
-                        (headerTitleBlock as HTMLElement).style.setProperty("width", "100%", "important");
-                    }
-
-                    // ── Card content: generous padding on all cards ──
-                    clonedDoc.querySelectorAll(".p-4").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "20px", "important");
-                    });
-                    clonedDoc.querySelectorAll(".p-5").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "22px", "important");
-                    });
-                    clonedDoc.querySelectorAll(".p-3").forEach((el) => {
-                        (el as HTMLElement).style.setProperty("padding", "16px", "important");
-                    });
-
-                    // ── Add vertical breathing room between sections ──
-                    clonedDoc.querySelectorAll("section").forEach((sec) => {
-                        (sec as HTMLElement).style.setProperty("margin-bottom", "32px", "important");
-                        (sec as HTMLElement).style.setProperty("padding-top", "8px", "important");
-                    });
-
-                    // ── Individual result/info cards: add margin between them ──
-                    clonedDoc.querySelectorAll("[class*='rounded-lg'][class*='border']").forEach((card) => {
-                        (card as HTMLElement).style.setProperty("margin-bottom", "20px", "important");
-                    });
-
-                    // ── Convert all CSS Grid elements to robust flex/block elements ──
-                    const grids = clonedDoc.querySelectorAll(".grid");
-                    grids.forEach((grid) => {
-                        const el = grid as HTMLElement;
-
-                        let cols = 1;
-                        if (el.classList.contains("md:grid-cols-3") || el.classList.contains("grid-cols-3")) {
-                            cols = 3;
-                        } else if (el.classList.contains("md:grid-cols-2") || el.classList.contains("grid-cols-2")) {
-                            cols = 2;
-                        }
-
-                        el.style.setProperty("display", "flex", "important");
-                        el.style.setProperty("flex-direction", "row", "important");
-                        el.style.setProperty("flex-wrap", "nowrap", "important");
-                        el.style.setProperty("gap", "20px", "important");
-                        el.style.setProperty("width", "100%", "important");
-                        el.style.setProperty("box-sizing", "border-box", "important");
-                        el.style.setProperty("margin-bottom", "20px", "important");
-
-                        const children = Array.from(el.children);
-                        if (cols > 1 && children.length > 0) {
-                            const widthPercent = Math.floor(100 / cols) - 2;
-                            children.forEach((child) => {
-                                const childEl = child as HTMLElement;
-                                childEl.style.setProperty("width", `${widthPercent}%`, "important");
-                                childEl.style.setProperty("max-width", `${widthPercent}%`, "important");
-                                childEl.style.setProperty("flex", "1 1 0%", "important");
-                                childEl.style.setProperty("box-sizing", "border-box", "important");
-                                childEl.style.setProperty("display", "block", "important");
-                            });
-                        } else {
-                            el.style.setProperty("flex-direction", "column", "important");
-                            children.forEach((child) => {
-                                const childEl = child as HTMLElement;
-                                childEl.style.setProperty("width", "100%", "important");
-                                childEl.style.setProperty("max-width", "100%", "important");
-                                childEl.style.setProperty("box-sizing", "border-box", "important");
-                                childEl.style.setProperty("display", "block", "important");
-                            });
-                        }
-                    });
-
-                    // Avoid flex wrap badge collapsing issues
-                    const flexWraps = clonedDoc.querySelectorAll(".flex.flex-wrap");
-                    flexWraps.forEach((flex) => {
-                        const el = flex as HTMLElement;
-                        el.style.setProperty("display", "flex", "important");
-                        el.style.setProperty("flex-direction", "row", "important");
-                        el.style.setProperty("flex-wrap", "wrap", "important");
-                        el.style.setProperty("gap", "8px", "important");
+                } else {
+                    el.style.setProperty("flex-direction", "column", "important");
+                    children.forEach((child) => {
+                        const childEl = child as HTMLElement;
+                        childEl.style.setProperty("width", "100%", "important");
+                        childEl.style.setProperty("max-width", "100%", "important");
+                        childEl.style.setProperty("box-sizing", "border-box", "important");
+                        childEl.style.setProperty("display", "block", "important");
+                        childEl.style.setProperty("overflow", "visible", "important");
                     });
                 }
             });
 
-            const imgData = canvas.toDataURL("image/png");
+            const flexWraps = clonedElement.querySelectorAll(".flex.flex-wrap");
+            flexWraps.forEach((flex) => {
+                const el = flex as HTMLElement;
+                el.style.setProperty("display", "flex", "important");
+                el.style.setProperty("flex-direction", "row", "important");
+                el.style.setProperty("flex-wrap", "wrap", "important");
+                el.style.setProperty("gap", "8px", "important");
+            });
 
-            const pdf = new jsPDF("p", "mm", "a4");
-            const imgWidth = 210;
-            const pageHeight = 295;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            let heightLeft = imgHeight;
-            let position = 0;
-
-            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+            // Group "Simplified Sections" title with the first card that follows it
+            const simplifiedSection = Array.from(clonedElement.children).find(
+                (child) => child.tagName === "SECTION" && child.querySelector("h2")?.textContent?.includes("Simplified Sections")
+            ) as HTMLElement;
+            
+            if (simplifiedSection) {
+                const h2 = simplifiedSection.querySelector("h2") as HTMLElement;
+                const risksPanel = simplifiedSection.querySelector(".pdf-avoid-break") as HTMLElement;
+                const cardsContainer = simplifiedSection.querySelector(".space-y-4") as HTMLElement;
+                
+                let firstCard = risksPanel;
+                if (!firstCard && cardsContainer) {
+                    firstCard = cardsContainer.firstElementChild as HTMLElement;
+                }
+                
+                if (h2 && firstCard) {
+                    const groupWrapper = document.createElement("div");
+                    groupWrapper.className = "pdf-grouped-block";
+                    groupWrapper.style.setProperty("display", "block", "important");
+                    groupWrapper.style.setProperty("margin-bottom", "16px", "important");
+                    
+                    h2.parentNode?.insertBefore(groupWrapper, h2);
+                    groupWrapper.appendChild(h2);
+                    groupWrapper.appendChild(firstCard);
+                    h2.style.setProperty("margin-bottom", "8px", "important");
+                }
             }
+
+            // Group "Glossary" title with the glossary card
+            const glossarySection = Array.from(clonedElement.children).find(
+                (child) => child.tagName === "SECTION" && child.querySelector("h2")?.textContent?.includes("Glossary")
+            ) as HTMLElement;
+            
+            if (glossarySection) {
+                const h2 = glossarySection.querySelector("h2") as HTMLElement;
+                const glossaryCard = glossarySection.querySelector(".bg-white") as HTMLElement;
+                
+                if (h2 && glossaryCard) {
+                    const groupWrapper = document.createElement("div");
+                    groupWrapper.className = "pdf-grouped-block";
+                    groupWrapper.style.setProperty("display", "block", "important");
+                    groupWrapper.style.setProperty("margin-bottom", "16px", "important");
+                    
+                    h2.parentNode?.insertBefore(groupWrapper, h2);
+                    groupWrapper.appendChild(h2);
+                    groupWrapper.appendChild(glossaryCard);
+                    h2.style.setProperty("margin-bottom", "8px", "important");
+                }
+            }
+
+            // 7. Extract blocks to render
+            const blocks: HTMLElement[] = [];
+            Array.from(clonedElement.children).forEach((child) => {
+                const childEl = child as HTMLElement;
+                if (childEl.hasAttribute("data-html2canvas-ignore") || childEl.style.display === "none") {
+                    return;
+                }
+                
+                if (childEl.tagName === "HEADER") {
+                    blocks.push(childEl);
+                } else if (childEl.tagName === "SECTION" && childEl.classList.contains("grid")) {
+                    // Metadata grid
+                    blocks.push(childEl);
+                } else if (childEl.tagName === "SECTION" && childEl.querySelector("h2")?.textContent?.includes("Simplified Sections")) {
+                    // This is the simplified sections wrapper
+                    Array.from(childEl.children).forEach((subChild) => {
+                        const subChildEl = subChild as HTMLElement;
+                        if (subChildEl.hasAttribute("data-html2canvas-ignore") || subChildEl.style.display === "none") {
+                            return;
+                        }
+                        
+                        if (subChildEl.classList.contains("pdf-grouped-block") || subChildEl.classList.contains("pdf-avoid-break")) {
+                            blocks.push(subChildEl);
+                        } else if (subChildEl.classList.contains("space-y-4")) {
+                            // This is the container holding the individual section cards (starting from card 2)
+                            Array.from(subChildEl.children).forEach((card) => {
+                                const cardEl = card as HTMLElement;
+                                if (!cardEl.hasAttribute("data-html2canvas-ignore") && cardEl.style.display !== "none") {
+                                    blocks.push(cardEl);
+                                }
+                            });
+                        }
+                    });
+                } else if (childEl.tagName === "SECTION" && childEl.querySelector("h2")?.textContent?.includes("Glossary")) {
+                    // Glossary section container
+                    Array.from(childEl.children).forEach((subChild) => {
+                        const subChildEl = subChild as HTMLElement;
+                        if (!subChildEl.hasAttribute("data-html2canvas-ignore") && subChildEl.style.display !== "none") {
+                            blocks.push(subChildEl);
+                        }
+                    });
+                } else {
+                    blocks.push(childEl);
+                }
+            });
+
+            // 8. Render blocks sequentially to jsPDF
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            const margin = 10;
+            const printableWidth = pdfWidth - (2 * margin);
+            const printableHeight = pdfHeight - (2 * margin);
+            let currentY = margin;
+            let isFirstPage = true;
+
+            const canvasCache = new Map<HTMLElement, { canvas: HTMLCanvasElement; heightMm: number; imgData: string }>();
+            
+            const getOrRenderBlock = async (el: HTMLElement) => {
+                if (canvasCache.has(el)) {
+                    return canvasCache.get(el)!;
+                }
+                const canvas = await html2canvas(el, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: "#f8fafc",
+                });
+                const imgData = canvas.toDataURL("image/png");
+                const heightMm = (canvas.height * printableWidth) / canvas.width;
+                const result = { canvas, heightMm, imgData };
+                canvasCache.set(el, result);
+                return result;
+            };
+
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i];
+                if (block.offsetHeight === 0) continue;
+
+                const { heightMm: blockHeightMm, imgData: blockImgData } = await getOrRenderBlock(block);
+                let totalHeightNeeded = blockHeightMm;
+
+                // Prevent orphan headings
+                const isHeadingElement = block.tagName === "H2" || block.tagName === "H3" || (block.classList.contains("flex") && block.querySelector("h2"));
+                if (isHeadingElement && i + 1 < blocks.length) {
+                    const nextBlock = blocks[i + 1];
+                    const { heightMm: nextHeightMm } = await getOrRenderBlock(nextBlock);
+                    totalHeightNeeded += nextHeightMm + 2.5;
+                }
+
+                if (!isFirstPage && currentY + totalHeightNeeded > pdfHeight - margin) {
+                    pdf.addPage();
+                    currentY = margin;
+                }
+
+                pdf.addImage(blockImgData, "PNG", margin, currentY, printableWidth, blockHeightMm);
+                currentY += blockHeightMm + 2.5;
+                isFirstPage = false;
+            }
+
+            // Cleanup cloned DOM
+            document.body.removeChild(clonedElement);
 
             const cleanName = (docData.filename || "simplified_contract").replace(/\.[^/.]+$/, "");
             pdf.save(`${cleanName}_simplified.pdf`);
@@ -415,7 +581,7 @@ export default function HistoryView() {
                                 Created: {new Date(docData.createdAt).toLocaleString()}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="hidden md:flex items-center gap-2 shrink-0">
                             <Button
                                 variant="outline"
                                 className="bg-white border-slate-300 hover:bg-slate-50 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
@@ -450,6 +616,25 @@ export default function HistoryView() {
                                 <ArrowLeft className="w-3.5 h-3.5" />
                                 Back
                             </Button>
+                        </div>
+
+                        {/* Mobile actions */}
+                        <div className="md:hidden flex items-center gap-2 shrink-0">
+                            <Button
+                                variant="outline"
+                                className="bg-white border-slate-200 hover:bg-slate-50 text-slate-700 h-9 rounded-md px-3 gap-1.5 text-xs shadow-sm font-semibold flex items-center"
+                                onClick={() => navigate(-1)}
+                            >
+                                <ArrowLeft className="w-3.5 h-3.5" />
+                                Back
+                            </Button>
+                            <button
+                                onClick={() => setIsMobileMenuOpen(true)}
+                                className="w-9 h-9 border border-slate-200 hover:border-slate-300 rounded-md bg-white shadow-sm flex items-center justify-center transition-all active:scale-95 text-slate-700"
+                                aria-label="Open menu"
+                            >
+                                <Menu className="w-5 h-5 text-teal-800" />
+                            </button>
                         </div>
                     </header>
 
@@ -492,7 +677,7 @@ export default function HistoryView() {
 
                         {/* Risk Analysis warning panel */}
                         {docData.risks && docData.risks.length > 0 && (
-                            <div className="space-y-3 bg-red-50/30 p-5 border border-red-200/60 rounded-lg animate-fade-in">
+                            <div className="space-y-3 bg-red-50/30 p-5 border border-red-200/60 rounded-lg animate-fade-in pdf-avoid-break">
                                 <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4 text-red-600 animate-bounce" />
                                     Risk & Redline Findings
@@ -536,7 +721,7 @@ export default function HistoryView() {
 
                         <div className="space-y-4">
                             {docData.sections.map((section: any, idx: number) => (
-                                <Card key={idx} className="bg-white border border-slate-200 p-5 shadow-sm rounded-lg space-y-4">
+                                <Card key={idx} className="bg-white border border-slate-200 p-5 shadow-sm rounded-lg space-y-4 pdf-avoid-break">
                                     <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                         <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
                                         Section {idx + 1}
@@ -563,7 +748,7 @@ export default function HistoryView() {
 
                                     {section.legalTerms?.length > 0 && (
                                         <div className="border-t border-slate-100 pt-3 space-y-2">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Legal Terms:</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Terms:</p>
                                             <div className="flex flex-wrap gap-2">
                                                 {section.legalTerms.map((termObj: any, i: number) => (
                                                     <div key={i} className="text-xs bg-slate-50 border border-slate-200 rounded p-2.5 max-w-md shadow-sm">
@@ -722,6 +907,67 @@ export default function HistoryView() {
                 >
                     <ChevronRight className="w-4 h-4 rotate-90" />
                 </button>
+            )}
+            {/* --- MOBILE NAVIGATION DRAWER --- */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 bg-white z-50 flex flex-col p-6 overflow-y-auto animate-fade-in md:hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-6 border-b border-slate-100">
+                        <Logo />
+                        <button
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="w-10 h-10 border border-slate-200 hover:border-slate-350 rounded-xl bg-white flex items-center justify-center transition-all active:scale-95 text-slate-500 hover:text-slate-800"
+                            aria-label="Close menu"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
+                    {/* User Greeting Card */}
+                    <div className="mt-4 bg-slate-50 p-4 rounded-lg border border-slate-200 shadow-sm">
+                        <h2 className="text-sm font-bold text-slate-800 tracking-tight truncate">
+                            Hello, {userName}
+                        </h2>
+                        <p className="text-slate-500 text-[11px] mt-0.5 font-medium">
+                            Welcome to your Dashboard
+                        </p>
+                    </div>
+
+                    {/* Nav Links */}
+                    <div className="mt-6 space-y-3">
+                        <button
+                            onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                navigate("/dashboard");
+                            }}
+                            className="w-full text-left px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-lg transition-all"
+                        >
+                            Back to Studio
+                        </button>
+                        <button
+                            onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                navigate("/glossary");
+                            }}
+                            className="w-full text-left px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm rounded-lg transition-all"
+                        >
+                            Jargon Library
+                        </button>
+                        {docData && (
+                            <button
+                                onClick={() => {
+                                    setIsMobileMenuOpen(false);
+                                    handleExportPDF();
+                                }}
+                                className="w-full text-left px-4 py-3 bg-teal-800 hover:bg-teal-900 text-white font-bold text-sm rounded-lg transition-all shadow-sm flex items-center gap-2"
+                                disabled={isExportingPDF}
+                            >
+                                <Download className="w-4 h-4" />
+                                Export PDF
+                            </button>
+                        )}
+                    </div>
+                </div>
             )}
         </>
     );

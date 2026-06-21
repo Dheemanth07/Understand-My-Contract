@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const AnalysisSchema = new mongoose.Schema(
     {
         userId: { type: String, required: true, index: true },
+        username: { type: String, index: true },
         status: { type: String, default: "processing" },
         filename: String,
         mimeType: String,
