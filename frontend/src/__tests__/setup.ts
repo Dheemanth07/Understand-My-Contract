@@ -38,6 +38,19 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
+// Mock window.IntersectionObserver
+class MockIntersectionObserver {
+  observe = jest.fn();
+  unobserve = jest.fn();
+  disconnect = jest.fn();
+}
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  configurable: true,
+  value: MockIntersectionObserver,
+});
+(global as any).IntersectionObserver = MockIntersectionObserver;
+
 // Set environment variables BEFORE importing any modules that use import.meta.env
 // ts-jest transforms import.meta.env.VITE_* to process.env.VITE_*
 process.env.VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'http://localhost:54321';

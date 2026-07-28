@@ -52,42 +52,13 @@ function splitIntoSections(text) {
     const trimmed = text.trim();
     if (!trimmed) return [];
 
-    // 1. Try splitting by explicit Article / Section / Clause headers or double linebreaks
-    let rawBlocks = trimmed.split(/(?=\n\s*(?:Article|SECTION|Section|CLAUSE|Clause|Recital|\d+\.\d+)\b)/i);
-
-    if (rawBlocks.length < 2) {
-        rawBlocks = trimmed.split(/\n\s*\n+/);
-    }
-
-    // 2. Keep section chunks around 1200 chars for lightning-fast AI responses and immediate section 1 rendering
-    const sections = [];
-    let currentChunk = "";
-
-    for (const block of rawBlocks) {
-        const cleanBlock = block.trim();
-        if (!cleanBlock) continue;
-
-        if (!currentChunk) {
-            currentChunk = cleanBlock;
-        } else if (currentChunk.length + cleanBlock.length < 1200) {
-            currentChunk += "\n\n" + cleanBlock;
-        } else {
-            sections.push(currentChunk);
-            currentChunk = cleanBlock;
-        }
-    }
-
-    if (currentChunk) {
-        sections.push(currentChunk);
-    }
-
-    // Cap at maximum 35 sections to guarantee fast, complete execution on massive PDFs
-    return sections.slice(0, 35);
+    const rawBlocks = trimmed.split(/\n\s*\n+/);
+    return rawBlocks.map((s) => s.trim()).filter(Boolean);
 }
 
 async function lookupDefinition(word) {
     if (!word || typeof word !== 'string' || word.trim() === '') {
-        return null;
+        return '(Definition not found)';
     }
     const cleanWord = word.trim();
     if (LEGAL_DICTIONARY[cleanWord]) {
@@ -97,7 +68,17 @@ async function lookupDefinition(word) {
     if (LEGAL_DICTIONARY[lower]) {
         return LEGAL_DICTIONARY[lower];
     }
-    return null;
+
+    try {
+        const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`);
+        const meanings = resp.data?.[0]?.meanings;
+        if (!meanings || meanings.length === 0) {
+            return '(Definition not found)';
+        }
+        return meanings[0].definitions[0].definition || '(Definition not found)';
+    } catch {
+        return '(Definition not found)';
+    }
 }
 
 async function detectLanguage(text) {
@@ -574,27 +555,7 @@ function extractJargon(text) {
     return Array.from(foundTerms);
 }
 
-async function lookupDefinition(word) {
-    // quick sanity checks
-    if (!word || typeof word !== 'string' || word.trim() === '') {
-        return '(Definition not found)';
-    }
 
-    if (LEGAL_DICTIONARY[word]) {
-        return LEGAL_DICTIONARY[word];
-    }
-
-    try {
-        const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-        const meanings = resp.data[0]?.meanings;
-        if (!meanings || meanings.length === 0) {
-            return '(Definition not found)';
-        }
-        return meanings[0].definitions[0].definition || '(Definition not found)';
-    } catch {
-        return '(Definition not found)';
-    }
-}
 
 function generateRuleBasedRisks(contractText) {
     if (!contractText || typeof contractText !== "string") return [];

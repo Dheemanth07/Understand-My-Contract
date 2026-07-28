@@ -5,7 +5,7 @@ import Logo from "./Logo";
 
 export default function Header() {
     return (
-        <header className="lp-floating-nav">
+        <header className="fixed top-0 left-0 w-full z-50 lp-floating-nav">
             {/* Left Side: Logo */}
             <Logo />
 

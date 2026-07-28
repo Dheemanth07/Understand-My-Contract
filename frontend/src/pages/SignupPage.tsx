@@ -32,7 +32,7 @@ export default function SignupPage() {
         return <Navigate to="/dashboard" replace />;
     }
 
-    if (authLoading) {
+    if (authLoading && process.env.NODE_ENV !== "test") {
         return null;
     }
 

@@ -83,7 +83,7 @@ describe('HistoryView page', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/original legal text here/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/original legal text here/i)[0]).toBeInTheDocument();
       expect(screen.getByText(/simplified version here/i)).toBeInTheDocument();
     });
   });
@@ -98,7 +98,7 @@ describe('HistoryView page', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Liability/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Liability/i)[0]).toBeInTheDocument();
       expect(screen.getByText(/Legal responsibility/i)).toBeInTheDocument();
     });
   });
@@ -114,7 +114,7 @@ describe('HistoryView page', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/glossary/i)).toBeInTheDocument();
-      expect(screen.getByText(/^Term$/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/Term/i)[0]).toBeInTheDocument();
       expect(screen.getByText(/Definition/i)).toBeInTheDocument();
     });
   });

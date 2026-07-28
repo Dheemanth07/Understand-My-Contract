@@ -32,7 +32,7 @@ describe('GoogleSignInButton', () => {
     const args = mockSupabaseAuth.signInWithOAuth.mock.calls[0][0];
     expect(args.provider).toBe('google');
     expect(args.options).toBeDefined();
-    expect(args.options.redirectTo).toBe(`${window.location.origin}/dashboard`);
+    expect(args.options.redirectTo).toBe(`${window.location.origin}/auth/callback`);
   });
 
   it('handles signInWithOAuth errors gracefully', async () => {
@@ -64,7 +64,7 @@ describe('GoogleSignInButton', () => {
     await userEvent.click(btn);
 
     const args = mockSupabaseAuth.signInWithOAuth.mock.calls.slice(-1)[0][0];
-    expect(args.options.redirectTo).toBe('https://staging.example.test/dashboard');
+    expect(args.options.redirectTo).toBe('https://staging.example.test/auth/callback');
 
     // restore
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
