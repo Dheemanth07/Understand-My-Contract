@@ -24,11 +24,21 @@ async function stopHandler(req, res) {
     return HistoryService.stop(req, res);
 }
 
+async function getActiveHandler(req, res) {
+    return HistoryService.getActiveProcessing(req, res);
+}
+
+async function generalChatHandler(req, res) {
+    return HistoryService.generalChat(req, res);
+}
+
 module.exports = {
     listHandler,
+    getActiveHandler,
     getByIdHandler,
     deleteHandler,
     chatHandler,
+    generalChatHandler,
     getMergedGlossaryHandler,
     stopHandler,
 };

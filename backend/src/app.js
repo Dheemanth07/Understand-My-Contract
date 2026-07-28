@@ -44,6 +44,11 @@ app.use(cors(corsOptions));
 app.options(/^.*$/, cors(corsOptions));
 app.use(express.json());
 
+app.use((req, res, next) => {
+    console.log(`[HTTP] ${req.method} ${req.url}`);
+    next();
+});
+
 // Global API Rate Limiter
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

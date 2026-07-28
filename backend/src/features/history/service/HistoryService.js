@@ -1,7 +1,7 @@
 const AnalysisRepository = require("../../../infrastructure/repositories/AnalysisRepository");
 const { getUserFromToken } = require("../../../utils/auth");
 const supabase = require("../../../utils/supabaseClient");
-const { callGemini } = require("../../../services/processing");
+const { callAI } = require("../../../services/processing");
 
 async function list(req, res) {
     try {
@@ -37,6 +37,26 @@ async function list(req, res) {
     }
 }
 
+async function getActiveProcessing(req, res) {
+    try {
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+
+        const doc = await AnalysisRepository.findActiveProcessingDoc(user.id);
+        if (!doc) return res.json(null);
+
+        if (!doc.risks || doc.risks.length === 0) {
+            const { analyzeRisksWithGemini } = require("../../../services/processing");
+            doc.risks = await analyzeRisksWithGemini(doc.text || "");
+        }
+
+        await AnalysisRepository.updateLastActive(doc._id);
+        return res.json(doc);
+    } catch {
+        res.status(500).json({ error: "Failed to fetch active document" });
+    }
+}
+
 async function getById(req, res) {
     try {
         const user = await getUserFromToken(req);
@@ -48,6 +68,13 @@ async function getById(req, res) {
 
         if (doc.status === "processing") {
             await AnalysisRepository.updateLastActive(id);
+        }
+
+        // ONLY compute risks if doc is ALREADY marked as completed by worker but risks are missing
+        if (doc.status === "completed" && (!doc.risks || doc.risks.length === 0)) {
+            const { analyzeRisksWithGemini } = require("../../../services/processing");
+            doc.risks = await analyzeRisksWithGemini(doc.sections.map(s => s.original).join("\n\n") || "");
+            await AnalysisRepository.setCompleted(id, doc.glossary || {}, doc.risks);
         }
 
         res.json(doc);
@@ -90,9 +117,10 @@ async function chat(req, res) {
         if (!doc || doc.userId !== user.id) return res.status(404).json({ error: "Document not found or access denied" });
 
         const contractText = doc.sections.map(s => s.original).join("\n\n");
-        const prompt = `You are an AI legal assistant. You are answering a question about a specific legal contract that the user has uploaded. 
-Answer the user's question accurately based ONLY on the provided contract text. Be helpful, clear, and refer to specific sections if they are relevant.
-If the answer is not found in the contract, explain that clearly and advise them based on standard legal practices, but clarify that it is not in the text.
+        const prompt = `You are an AI legal assistant. You are answering a question about a specific legal contract that the user has uploaded.
+Answer the user's question accurately based ONLY on the provided contract text. Be helpful, clear, and refer to specific sections if relevant.
+IMPORTANT: Use plain text only. Do NOT use markdown asterisks (**) or (*) for bold or italic. Use numbered lists and plain headings instead.
+If the answer is not found in the contract, explain that clearly and advise them based on standard legal practices.
 
 Contract text:
 "${contractText.substring(0, 20000)}"
@@ -100,16 +128,45 @@ Contract text:
 User question:
 "${message}"`;
 
-        const reply = await callGemini(prompt);
-        if (reply) {
-            return res.json({ reply });
-        }
-
-        return res.json({
-            reply: `I was unable to reach the AI engine to review this contract right now. However, looking at the contract name "${doc.filename}", make sure to review the document for specific clauses related to your question.`
-        });
+        const reply = await callAI(prompt, doc.filename);
+        return res.json({ reply });
     } catch (err) {
         console.error("Chat endpoint error:", err);
+        res.status(500).json({ error: "Chat failed" });
+    }
+}
+
+async function generalChat(req, res) {
+    try {
+        const user = await getUserFromToken(req);
+        if (!user) return res.status(401).json({ error: "Authentication required" });
+
+        const { message, contextText, filename } = req.body;
+        if (!message) return res.status(400).json({ error: "Message is required" });
+
+        let prompt = "";
+        if (contextText && contextText.trim().length > 0) {
+            prompt = `You are an AI legal assistant. You are answering a question about a contract named "${filename || "Document"}".
+Answer the user's question accurately based on the provided contract text. Be helpful, clear, and refer to specific clauses if relevant.
+IMPORTANT: Use plain text only. Do NOT use markdown asterisks (**) or (*) for bold or italic. Use numbered lists and plain section headings instead.
+
+Contract text:
+"${contextText.substring(0, 20000)}"
+
+User question:
+"${message}"`;
+        } else {
+            prompt = `You are LegalSimplify AI, an expert corporate legal assistant. Answer the user's question clearly, accurately, and professionally.
+IMPORTANT: Use plain text only. Do NOT use markdown asterisks (**) or (*) for bold or italic. Use numbered lists and plain section headings instead.
+
+User question:
+"${message}"`;
+        }
+
+        const reply = await callAI(prompt, filename);
+        return res.json({ reply });
+    } catch (err) {
+        console.error("General chat endpoint error:", err);
         res.status(500).json({ error: "Chat failed" });
     }
 }
@@ -177,5 +234,5 @@ async function stop(req, res) {
     }
 }
 
-module.exports = { list, getById, deleteById, chat, getMergedGlossary, stop };
+module.exports = { list, getActiveProcessing, getById, deleteById, chat, generalChat, getMergedGlossary, stop };
 
