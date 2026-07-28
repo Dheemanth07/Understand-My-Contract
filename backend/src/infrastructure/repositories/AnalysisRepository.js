@@ -21,7 +21,7 @@ async function setFailed(analysisId) {
 }
 
 async function listUserHistory(userId) {
-    const historyQuery = Analysis.find({ userId }, { filename: 1, createdAt: 1, _id: 1 });
+    const historyQuery = Analysis.find({ userId, status: { $ne: "processing" } }, { filename: 1, createdAt: 1, _id: 1 });
     if (typeof historyQuery.sort === "function") {
         const docs = await historyQuery.sort({ createdAt: -1 }).limit(50).lean();
         return docs;
@@ -30,7 +30,7 @@ async function listUserHistory(userId) {
 }
 
 async function listUserHistoryPaginated(userId, limit = 5, cursor = null) {
-    const filter = { userId };
+    const filter = { userId, status: { $ne: "processing" } };
     if (cursor) {
         filter.createdAt = { $lt: new Date(cursor) };
     }
@@ -43,6 +43,10 @@ async function listUserHistoryPaginated(userId, limit = 5, cursor = null) {
     const items = hasMore ? docs.slice(0, limit) : docs;
     const nextCursor = hasMore ? items[items.length - 1].createdAt.toISOString() : null;
     return { items, nextCursor, hasMore };
+}
+
+async function findActiveProcessingDoc(userId) {
+    return Analysis.findOne({ userId, status: "processing" }).sort({ createdAt: -1 }).lean();
 }
 
 async function updateLastActive(analysisId) {
@@ -68,6 +72,7 @@ module.exports = {
     setFailed,
     listUserHistory,
     listUserHistoryPaginated,
+    findActiveProcessingDoc,
     updateLastActive,
     getUserGlossaries,
     getById,
