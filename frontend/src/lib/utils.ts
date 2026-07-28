@@ -14,47 +14,55 @@ export function formatMarkdownToHtml(text: string): string {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
         
-    // 2. Convert bold: **text** -> <strong>text</strong>
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-    
-    // 3. Process lines to handle bullet points and numbered points
+    // 2. Convert bold: **text** -> styled strong
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>');
+
+    // 3. Process lines
     const lines = html.split("\n");
     let inList = false;
     let listType: "ul" | "ol" | null = null;
     const processedLines: string[] = [];
     
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const raw = lines[i];
+        const line = raw.trim();
         
-        // Match bullet points starting with * or - or •
-        const bulletMatch = line.match(/^[\*\-\u2022]\s+(.*)/);
+        // Match bullet points: single * (not **), - or •
+        const bulletMatch = line.match(/^(?:\*(?!\*)|\-|\u2022)\s+(.*)/);
         // Match numbered points starting with number + dot/parenthesis
         const numberMatch = line.match(/^(\d+)[\.\)]\s+(.*)/);
         
         if (bulletMatch) {
             if (!inList || listType !== "ul") {
                 if (inList) processedLines.push(listType === "ol" ? "</ol>" : "</ul>");
-                processedLines.push('<ul class="list-disc pl-5 my-2 space-y-1">');
+                processedLines.push('<ul class="list-disc pl-4 mt-3 mb-3 space-y-2 text-slate-700">');
                 inList = true;
                 listType = "ul";
             }
-            processedLines.push(`<li>${bulletMatch[1]}</li>`);
+            processedLines.push(`<li class="leading-relaxed">${bulletMatch[1]}</li>`);
         } else if (numberMatch) {
             if (!inList || listType !== "ol") {
                 if (inList) processedLines.push(listType === "ol" ? "</ol>" : "</ul>");
-                processedLines.push('<ol class="list-decimal pl-5 my-2 space-y-1">');
+                processedLines.push('<ol class="list-decimal pl-4 mt-3 mb-3 space-y-2 text-slate-700">');
                 inList = true;
                 listType = "ol";
             }
-            processedLines.push(`<li>${numberMatch[2]}</li>`);
+            processedLines.push(`<li class="leading-relaxed">${numberMatch[2]}</li>`);
         } else {
             if (inList) {
                 processedLines.push(listType === "ol" ? "</ol>" : "</ul>");
                 inList = false;
                 listType = null;
             }
-            // Retain normal lines with pre-wrap behavior
-            processedLines.push(line ? `<p class="mb-2">${line}</p>` : '<div class="h-2"></div>');
+            if (!line) {
+                processedLines.push('<div style="height:6px"></div>');
+            } else {
+                // Apply italic only on regular (non-bullet) lines
+                const formatted = line.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '<em class="italic text-slate-600">$1</em>');
+                const hasBoldStart = formatted.startsWith('<strong');
+                const marginClass = hasBoldStart ? 'mt-3 mb-1 font-medium' : 'mt-1 mb-1';
+                processedLines.push(`<p class="leading-relaxed ${marginClass}">${formatted}</p>`);
+            }
         }
     }
     

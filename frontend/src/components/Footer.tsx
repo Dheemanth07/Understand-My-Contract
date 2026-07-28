@@ -33,17 +33,23 @@ function LinkedinIcon({ size = 18 }: { size?: number }) {
 
 const Footer = () => {
     return (
-        <footer className="bg-white border-t border-slate-200/80 text-slate-500">
-            <div className="max-w-7xl mx-auto px-6 py-8">
+        <footer className="bg-white border-t border-slate-200 text-slate-500">
+            <div className="max-w-6xl mx-auto px-6 py-8">
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                    {/* Brand */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="bg-blue-50 p-1.5 rounded-lg border border-blue-100/80 flex items-center justify-center">
-                            <Scale className="w-5 h-5 text-blue-600" />
+                    {/* Brand + Attribution */}
+                    <div className="flex flex-col sm:items-start items-center gap-1 text-center sm:text-left">
+                        <div className="flex items-center gap-2.5">
+                            <div className="bg-blue-50 p-1.5 rounded-lg border border-blue-100 flex items-center justify-center">
+                                <Scale className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <span className="text-base font-bold text-slate-900 tracking-tight">
+                                LegalSimplify
+                            </span>
                         </div>
-                        <span className="text-lg font-bold text-slate-900 tracking-tight">
-                            LegalSimplify
-                        </span>
+                        <p className="text-xs text-slate-400">
+                            Designed & Built by{" "}
+                            <span className="font-semibold text-slate-600">Dheemanth</span>
+                        </p>
                     </div>
 
                     {/* Social/Links */}
@@ -52,7 +58,7 @@ const Footer = () => {
                             href="https://github.com/Dheemanth07/Understand-My-Contract"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs font-semibold text-[#4d5c65] hover:text-[#0d6b5f] transition-colors no-underline"
+                            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors no-underline"
                             aria-label="View source on GitHub"
                         >
                             <GithubIcon size={16} />
@@ -62,7 +68,7 @@ const Footer = () => {
                             href="https://www.linkedin.com/in/dheemanth-d-522469291/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[#4d5c65] hover:text-[#007bcd] transition-colors"
+                            className="text-slate-500 hover:text-blue-600 transition-colors"
                             aria-label="LinkedIn"
                         >
                             <LinkedinIcon size={18} />
