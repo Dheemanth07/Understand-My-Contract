@@ -37,7 +37,7 @@
     "helmet": "^8.2.0",
     "mammoth": "^1.10.0",
     "mongod": "^2.0.0",
-    "mongoose": "^8.18.2",
+    "mongoose": "^9.8.1",
     "multer": "^2.0.2",
     "pdf-parse": "^1.1.1"
   },
