@@ -32,6 +32,24 @@ const PrivateRoute = ({ children }: { children: ReactNode }) => {
         return () => clearInterval(intervalId);
     }, [session]);
 
+    // History lock: Prevent browser Back button from exiting authenticated session to Google OAuth or signin pages
+    useEffect(() => {
+        if (!session) return;
+
+        window.history.pushState(null, "", window.location.href);
+
+        const handlePopState = () => {
+            if (session) {
+                window.history.pushState(null, "", window.location.href);
+            }
+        };
+
+        window.addEventListener("popstate", handlePopState);
+        return () => {
+            window.removeEventListener("popstate", handlePopState);
+        };
+    }, [session]);
+
     if (loading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center">
@@ -41,7 +59,7 @@ const PrivateRoute = ({ children }: { children: ReactNode }) => {
     }
 
     if (!session) {
-        return <Navigate to="/signin" />;
+        return <Navigate to="/signin" replace />;
     }
 
     return <>{children}</>;

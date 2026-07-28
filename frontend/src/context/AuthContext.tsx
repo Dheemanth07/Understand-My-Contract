@@ -12,16 +12,45 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getCachedSession = (): Session | null => {
+    try {
+        const key = Object.keys(localStorage).find((k) => k.startsWith("sb-") && k.endsWith("-auth-token"));
+        if (key) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && (parsed.access_token || parsed.currentSession?.access_token)) {
+                    return parsed.currentSession || parsed;
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore parse error
+    }
+    return null;
+};
+
 export const AuthContextProvider = ({ children }: { children: ReactNode }) => {
-    const [session, setSession] = useState<Session | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [session, setSession] = useState<Session | null>(() => getCachedSession());
+    const [loading, setLoading] = useState<boolean>(() => !getCachedSession());
 
     useEffect(() => {
+        // Verify with Supabase client
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setLoading(false);
+        });
+
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setLoading(false);
+
+            // Clean up Google OAuth hash from URL and history entry so pressing Back in browser doesn't return to OAuth state
+            if (session && window.location.hash && window.location.hash.includes("access_token")) {
+                window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
         });
 
         return () => {
