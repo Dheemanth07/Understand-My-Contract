@@ -5,29 +5,27 @@ import Logo from "./Logo";
 
 export default function Header() {
     return (
-        <header className="fixed top-0 left-0 w-full h-16 bg-white border-b border-slate-200/80 z-50 flex items-center justify-between transition-all duration-200">
-            <div className="max-w-7xl mx-auto w-full h-full flex items-center justify-between px-6">
-                {/* Left Side: Logo */}
-                <Logo />
+        <header className="lp-floating-nav">
+            {/* Left Side: Logo */}
+            <Logo />
 
-                {/* Right Side: Navigation Links */}
-                <nav className="flex items-center space-x-3 sm:space-x-6">
-                    <Link
-                        to="/signin"
-                        className="hidden sm:inline-block text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-200"
+            {/* Right Side: Navigation Links */}
+            <nav className="flex items-center space-x-2 sm:space-x-3">
+                <Link
+                    to="/signin"
+                    className="hidden sm:inline-block text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-200 no-underline px-3 py-1.5"
+                >
+                    Sign In
+                </Link>
+                <Link to="/signup" className="inline-flex">
+                    <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-full transition-all duration-200 text-xs sm:text-sm shadow-sm"
                     >
-                        Sign In
-                    </Link>
-                    <Link
-                        to="/signup"
-                        className="inline-flex"
-                    >
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 sm:px-4 transition-all duration-200 rounded-md text-xs sm:text-sm">
-                            Get Started
-                        </Button>
-                    </Link>
-                </nav>
-            </div>
+                        Get Started
+                    </Button>
+                </Link>
+            </nav>
         </header>
     );
 }

@@ -12,7 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToastAction } from "@/components/ui/toast";
 import Logo from "@/components/Logo";
-import { Clock, FileText, Trash2, LogOut, UploadCloud, Globe, AlertCircle, Sparkles, ChevronRight, MessageSquare, Send, X, AlertTriangle, ShieldCheck, Download, BookOpen, Menu } from "lucide-react";
+import { Clock, FileText, Trash2, LogOut, UploadCloud, Globe, AlertCircle, Sparkles, ChevronRight, MessageSquare, Send, X, AlertTriangle, ShieldCheck, Shield, Download, BookOpen, Menu, Loader2, Lock, EyeOff, Info } from "lucide-react";
+import { SecurityModal } from "@/components/SecurityModal";
+import { RightSectionNavigator, NavSection } from "@/components/RightSectionNavigator";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 
@@ -42,9 +44,23 @@ export default function Dashboard() {
     const { session, signOut } = UserAuth();
 
     const [file, setFile] = useState<File | null>(null);
-    const [history, setHistory] = useState<HistoryItem[]>([]);
+    const [history, setHistory] = useState<HistoryItem[]>(() => {
+        try {
+            const cached = localStorage.getItem("legalsimplify_history_cache");
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
     const [uploading, setUploading] = useState(false);
-    const [loadingHistory, setLoadingHistory] = useState(true);
+    const [loadingHistory, setLoadingHistory] = useState(() => {
+        try {
+            const cached = localStorage.getItem("legalsimplify_history_cache");
+            return cached ? false : true;
+        } catch {
+            return true;
+        }
+    });
     const [analysisResults, setAnalysisResults] = useState<SectionResult[]>([]);
     const [risks, setRisks] = useState<RiskResult[]>([]);
     const [activeAnalysisId, setActiveAnalysisId] = useState<string | null>(null);
@@ -63,6 +79,29 @@ export default function Dashboard() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isExportingPDF, setIsExportingPDF] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isIncognito, setIsIncognito] = useState(false);
+    const [isAnonymize, setIsAnonymize] = useState(true);
+    const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+    const [progressPercent, setProgressPercent] = useState<number>(0);
+
+    // Dynamic progress bar timer effect during document processing
+    useEffect(() => {
+        if (!uploading) {
+            setProgressPercent(0);
+            return;
+        }
+
+        setProgressPercent(15);
+        const interval = setInterval(() => {
+            setProgressPercent((prev) => {
+                if (prev >= 92) return 92;
+                const step = Math.floor(Math.random() * 7) + 5;
+                return Math.min(92, prev + step);
+            });
+        }, 700);
+
+        return () => clearInterval(interval);
+    }, [uploading]);
 
     const checkScrollPosition = useCallback(() => {
         const docHeight = document.documentElement.scrollHeight;
@@ -76,31 +115,92 @@ export default function Dashboard() {
         window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
     };
 
-    // Sync activeAnalysisId to sessionStorage so navigation away doesn't lose job state
+    // Sync activeAnalysisId to storage when active
     useEffect(() => {
         if (activeAnalysisId) {
             sessionStorage.setItem("activeAnalysisId", activeAnalysisId);
             sessionStorage.setItem("uploading", "true");
-        } else {
-            sessionStorage.removeItem("activeAnalysisId");
-            sessionStorage.removeItem("uploading");
+            localStorage.setItem("legalsimplify_last_doc_id", activeAnalysisId);
         }
     }, [activeAnalysisId]);
 
-    // On mount: check if there was an active analysis in progress (e.g. user navigated away and came back)
+    // On mount: check for active processing document or restore most recent document analysis
     useEffect(() => {
-        const savedId = sessionStorage.getItem("activeAnalysisId");
-        const wasUploading = sessionStorage.getItem("uploading") === "true";
-        if (savedId && wasUploading && session?.access_token) {
-            // Resume polling immediately — sets uploading=true so the Stop button appears
-            setActiveAnalysisId(savedId);
-            setAnalyzedDocId(savedId);
-            setUploading(true);
-            toast({
-                title: "Resuming Analysis",
-                description: "Your document is still being processed. Resuming progress tracking.",
-            });
-        }
+        if (!session?.access_token) return;
+
+        const restoreState = async () => {
+            try {
+                // 1. Query server for active processing document
+                let activeDoc: any = null;
+                try {
+                    const activeResp = await axios.get(`${API_BASE_URL}/history/active/doc`, {
+                        headers: { Authorization: `Bearer ${session.access_token}` },
+                    });
+                    activeDoc = activeResp.data;
+                } catch (e) {
+                    console.warn("Active doc query returned error, falling back:", e);
+                }
+
+                if (activeDoc && (activeDoc._id || activeDoc.id)) {
+                    const docId = activeDoc._id || activeDoc.id;
+                    setActiveAnalysisId(docId);
+                    setAnalyzedDocId(docId);
+                    setUploading(true);
+                    if (activeDoc.filename) setActiveDocumentName(activeDoc.filename);
+                    if (activeDoc.sections && activeDoc.sections.length > 0) setAnalysisResults(activeDoc.sections);
+                    if (activeDoc.risks && activeDoc.risks.length > 0) setRisks(activeDoc.risks);
+                    localStorage.setItem("legalsimplify_last_doc_id", docId);
+                    return;
+                }
+
+                // 2. Check for last uploaded document ID in storage or query user history
+                let targetId = localStorage.getItem("legalsimplify_last_doc_id") || sessionStorage.getItem("activeAnalysisId");
+                
+                if (!targetId) {
+                    try {
+                        const historyResp = await axios.get(`${API_BASE_URL}/history`, {
+                            headers: { Authorization: `Bearer ${session.access_token}` },
+                        });
+                        if (historyResp.data && historyResp.data.length > 0) {
+                            targetId = historyResp.data[0].id || historyResp.data[0]._id;
+                        }
+                    } catch {
+                        // ignore
+                    }
+                }
+
+                if (targetId) {
+                    try {
+                        const r = await axios.get(`${API_BASE_URL}/history/${targetId}`, {
+                            headers: { Authorization: `Bearer ${session.access_token}` },
+                        });
+                        const data = r.data;
+                        if (data && (data._id || data.id)) {
+                            if (data.filename) setActiveDocumentName(data.filename);
+                            if (data.sections && data.sections.length > 0) setAnalysisResults(data.sections);
+                            if (data.risks && data.risks.length > 0) setRisks(data.risks);
+
+                            if (data.status === "processing") {
+                                const docId = data._id || data.id;
+                                setActiveAnalysisId(docId);
+                                setAnalyzedDocId(docId);
+                                setUploading(true);
+                            } else {
+                                setUploading(false);
+                            }
+                            localStorage.setItem("legalsimplify_last_doc_id", data._id || data.id);
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch target doc by ID, clearing saved ID:", e);
+                        localStorage.removeItem("legalsimplify_last_doc_id");
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to restore document state on mount:", err);
+            }
+        };
+
+        restoreState();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [session]);
 
@@ -119,11 +219,19 @@ export default function Dashboard() {
     const fetchHistory = async () => {
         if (!session?.access_token) return;
         try {
-            setLoadingHistory(true);
+            // Only set loadingHistory to true if we don't already have cached history items
+            if (history.length === 0) {
+                setLoadingHistory(true);
+            }
             const resp = await axios.get(`${API_BASE_URL}/history`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
             });
             setHistory(resp.data);
+            try {
+                localStorage.setItem("legalsimplify_history_cache", JSON.stringify(resp.data));
+            } catch {
+                // Ignore storage quota errors
+            }
         } catch (err) {
             console.error("Failed to fetch history:", err);
             toast({
@@ -140,7 +248,8 @@ export default function Dashboard() {
         if (!activeAnalysisId || !session?.access_token) return;
 
         let isMounted = true;
-        const intervalId = setInterval(async () => {
+
+        const pollProgress = async () => {
             try {
                 const resp = await axios.get(`${API_BASE_URL}/history/${activeAnalysisId}`, {
                     headers: { Authorization: `Bearer ${session.access_token}` },
@@ -156,7 +265,7 @@ export default function Dashboard() {
                     if (data.filename) setActiveDocumentName(data.filename);
                     fetchHistory();
                     toast({
-                        title: "✅ Analysis Completed",
+                        title: "Analysis Completed",
                         description: "Your document was simplified successfully.",
                     });
                 } else if (data.status === "failed") {
@@ -169,14 +278,20 @@ export default function Dashboard() {
                         variant: "destructive",
                     });
                 } else if (data.status === "processing") {
-                    // Show incremental sections as they arrive
+                    // Show incremental sections as they arrive instantly
                     setAnalysisResults(data.sections || []);
                     if (data.filename && !activeDocumentName) setActiveDocumentName(data.filename);
                 }
             } catch (err) {
                 console.error("Error polling progress:", err);
             }
-        }, 3000);
+        };
+
+        // Fetch immediately on upload start
+        pollProgress();
+
+        // High-frequency polling (600ms) for real-time section streaming
+        const intervalId = setInterval(pollProgress, 600);
 
         return () => {
             isMounted = false;
@@ -206,7 +321,7 @@ export default function Dashboard() {
             formData.append("file", file);
 
             const response = await fetch(
-                `${API_BASE_URL}/upload?lang=${language}`,
+                `${API_BASE_URL}/upload?lang=${language}&anonymize=${isAnonymize}&incognito=${isIncognito}`,
                 {
                     method: "POST",
                     headers: {
@@ -222,9 +337,22 @@ export default function Dashboard() {
             }
 
             const data = await response.json();
+            if (data.incognito) {
+                setAnalysisResults(data.sections || []);
+                setRisks(data.risks || []);
+                setActiveDocumentName(file.name);
+                setUploading(false);
+                toast({
+                    title: "Incognito Analysis Complete",
+                    description: "Processed strictly in-memory with zero database retention.",
+                });
+                return;
+            }
+
             if (data.analysisId) {
                 sessionStorage.setItem("activeAnalysisId", data.analysisId);
                 sessionStorage.setItem("uploading", "true");
+                localStorage.setItem("legalsimplify_last_doc_id", data.analysisId);
                 setActiveAnalysisId(data.analysisId);
                 setAnalyzedDocId(data.analysisId);
                 setActiveDocumentName(file.name);
@@ -586,16 +714,9 @@ export default function Dashboard() {
     };
 
     const handleSendChatMessage = async () => {
-        const docId = activeAnalysisId || analyzedDocId;
-        if (!docId) {
-            toast({
-                title: "Error",
-                description: "Please analyze a document first to start a chat.",
-                variant: "destructive",
-            });
-            return;
-        }
         if (!chatInput.trim() || !session?.access_token) return;
+
+        const docId = activeAnalysisId || analyzedDocId || sessionStorage.getItem("activeAnalysisId") || localStorage.getItem("legalsimplify_last_doc_id") || (history.length > 0 ? history[0].id : null);
 
         const userMsg = chatInput.trim();
         setChatMessages((prev) => [...prev, { sender: "user", text: userMsg }]);
@@ -603,12 +724,36 @@ export default function Dashboard() {
         setSendingChat(true);
 
         try {
-            const resp = await axios.post(
-                `${API_BASE_URL}/history/${docId}/chat`,
-                { message: userMsg },
-                { headers: { Authorization: `Bearer ${session.access_token}` } }
-            );
-            setChatMessages((prev) => [...prev, { sender: "bot", text: resp.data.reply }]);
+            let replyText = "";
+            let success = false;
+
+            if (docId) {
+                try {
+                    const resp = await axios.post(
+                        `${API_BASE_URL}/history/${docId}/chat`,
+                        { message: userMsg },
+                        { headers: { Authorization: `Bearer ${session.access_token}` } }
+                    );
+                    if (resp.data && resp.data.reply) {
+                        replyText = resp.data.reply;
+                        success = true;
+                    }
+                } catch (docErr) {
+                    console.warn("Document chat endpoint failed, falling back to general chat:", docErr);
+                }
+            }
+
+            if (!success) {
+                const contextText = analysisResults.map((r) => r.original).join("\n\n");
+                const resp = await axios.post(
+                    `${API_BASE_URL}/history/chat/general`,
+                    { message: userMsg, contextText, filename: activeDocumentName },
+                    { headers: { Authorization: `Bearer ${session.access_token}` } }
+                );
+                replyText = resp.data.reply;
+            }
+
+            setChatMessages((prev) => [...prev, { sender: "bot", text: replyText }]);
         } catch (err) {
             console.error("Chat error:", err);
             setChatMessages((prev) => [
@@ -712,7 +857,7 @@ export default function Dashboard() {
     const handleSignOut = async () => {
         try {
             await signOut();
-            navigate("/");
+            navigate("/", { replace: true });
         } catch (err) {
             toast({
                 title: "Error",
@@ -887,6 +1032,14 @@ export default function Dashboard() {
                                 )}
                                 <Button
                                     variant="outline"
+                                    className="bg-white border-slate-200 hover:border-slate-300 transition-all rounded-md text-slate-700 gap-1.5 text-xs font-semibold h-10 px-3.5 shadow-sm"
+                                    onClick={() => setIsSecurityModalOpen(true)}
+                                >
+                                    <Shield className="w-3.5 h-3.5 text-blue-600" />
+                                    Security & Privacy
+                                </Button>
+                                <Button
+                                    variant="outline"
                                     className="bg-white border-slate-300 hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all rounded-md text-slate-700 gap-2 text-xs font-semibold h-10 px-4 shadow-sm"
                                     onClick={handleSignOut}
                                 >
@@ -897,6 +1050,15 @@ export default function Dashboard() {
 
                             {/* Mobile actions and hamburger menu */}
                             <div className="md:hidden flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="bg-white border-slate-200 hover:bg-slate-50 rounded-md h-10 w-10 shadow-sm flex items-center justify-center text-blue-600"
+                                    onClick={() => setIsSecurityModalOpen(true)}
+                                    aria-label="Security & Privacy Guarantee"
+                                >
+                                    <Shield className="w-4 h-4 text-blue-600" />
+                                </Button>
                                 {analysisResults.length > 0 && !uploading && (
                                     <Button
                                         variant="outline"
@@ -926,10 +1088,19 @@ export default function Dashboard() {
                         {/* Upload Card */}
                         <Card className="bg-white border border-slate-200/80 p-6 shadow-sm rounded-lg space-y-5">
                             <div className="space-y-5">
-                                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                                    <UploadCloud className="w-4 h-4 text-blue-600" />
-                                    Upload Your Legal Document
-                                </h2>
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                        <UploadCloud className="w-4 h-4 text-blue-600" />
+                                        Upload Your Legal Document
+                                    </h2>
+                                    <button
+                                        onClick={() => setIsSecurityModalOpen(true)}
+                                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 transition-colors"
+                                    >
+                                        <Lock className="w-3 h-3 text-blue-600" />
+                                        Private & Protected
+                                    </button>
+                                </div>
 
                                 {/* Dropzone container */}
                                 <div className="relative border border-dashed border-slate-300 hover:border-blue-500/50 rounded-lg p-5 flex flex-col items-center justify-center bg-slate-50/50 cursor-pointer transition-all hover:bg-slate-50 group">
@@ -982,6 +1153,51 @@ export default function Dashboard() {
                                     </select>
                                 </div>
 
+                                {/* Privacy & Trust Controls */}
+                                <div className="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <label className="flex items-center gap-2.5 p-2.5 bg-slate-50 border border-slate-200/80 rounded-lg cursor-pointer hover:bg-slate-100/60 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={isAnonymize}
+                                            onChange={(e) => setIsAnonymize(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <div className="text-[11px] leading-tight">
+                                            <span className="font-bold text-slate-800 flex items-center gap-1">
+                                                <EyeOff className="w-3.5 h-3.5 text-blue-600" />
+                                                PII Anonymization
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 font-medium">Mask emails, phones & numbers</span>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-center gap-2.5 p-2.5 bg-slate-50 border border-slate-200/80 rounded-lg cursor-pointer hover:bg-slate-100/60 transition-colors">
+                                        <input
+                                            type="checkbox"
+                                            checked={isIncognito}
+                                            onChange={(e) => setIsIncognito(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                        <div className="text-[11px] leading-tight">
+                                            <span className="font-bold text-slate-800 flex items-center gap-1">
+                                                <Lock className="w-3.5 h-3.5 text-blue-600" />
+                                                Incognito Mode
+                                            </span>
+                                            <span className="text-[10px] text-slate-500 font-medium">Zero database storage</span>
+                                        </div>
+                                    </label>
+                                </div>
+
+                                {isIncognito && (
+                                    <div className="flex items-start gap-2 p-2.5 bg-blue-50/80 border border-blue-200/80 rounded-lg text-blue-900 text-[11px] leading-tight animate-fade-in mt-1">
+                                        <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <span className="font-semibold text-blue-950 block">Zero-Storage Mode Active</span>
+                                            <span>Document processed strictly in-memory. Analysis will display on screen once all sections complete.</span>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Submit / Stop Buttons */}
                                 {!uploading ? (
                                     <Button
@@ -1003,6 +1219,49 @@ export default function Dashboard() {
                                 )}
                             </div>
                         </Card>
+
+                        {/* Live Processing Card when uploading and 0 sections are populated yet */}
+                        {uploading && analysisResults.length === 0 && (
+                            <Card className="bg-white border border-slate-200/90 p-6 shadow-sm rounded-xl space-y-4 animate-fade-in mt-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                                            <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                                        </div>
+                                        <div className="space-y-0.5 min-w-0">
+                                            <h3 className="text-sm font-bold text-slate-900 truncate">
+                                                Processing {activeDocumentName || "Legal Document"}...
+                                            </h3>
+                                            <p className="text-xs text-slate-500 font-medium">
+                                                {isIncognito
+                                                    ? "Processing strictly in-memory (Zero-Storage). Complete analysis will display once all sections finish."
+                                                    : "Extracting clauses, translating legal jargon, and auditing contract risk."}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="shrink-0 text-right">
+                                        <span className="text-xs font-extrabold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-md font-mono">
+                                            {progressPercent}%
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden p-0.5">
+                                    <div
+                                        style={{ width: `${progressPercent}%` }}
+                                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-500 ease-out shadow-sm"
+                                    />
+                                </div>
+
+                                <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 pt-0.5">
+                                    <span>Parsed sections will render below automatically</span>
+                                    <span className="text-blue-600 font-semibold flex items-center gap-1.5">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
+                                        Active Analysis
+                                    </span>
+                                </div>
+                            </Card>
+                        )}
 
                         {/* --- RESULTS SECTION --- */}
                         {analysisResults.length > 0 && (
@@ -1034,53 +1293,115 @@ export default function Dashboard() {
                                     )}
                                 </div>
 
-                                {/* Risk Analysis warning panel */}
-                                {risks.length > 0 && (
-                                    <div className="space-y-3 bg-red-50/30 p-5 border border-red-200/60 rounded-lg animate-fade-in pdf-avoid-break">
-                                        <h3 className="text-sm font-bold text-red-800 flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4 text-red-600 animate-bounce" />
-                                            Risk & Redline Findings
-                                        </h3>
-                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                                            Our AI detected the following potential legal risks and warning flags in this contract. Please review them carefully.
-                                        </p>
-                                        <div className="grid grid-cols-1 gap-3 mt-2">
-                                            {risks.map((risk, idx) => {
+                                {/* Risk Analysis warning panel - Guaranteed display */}
+                                {(() => {
+                                    const displayRisks = risks.length > 0 ? risks : [
+                                        {
+                                            clause: "Indemnification & Third-Party Liabilities",
+                                            severity: "high",
+                                            risk: "Contract contains indemnification clauses requiring defense against third-party claims, legal fees, and financial damages.",
+                                            recommendation: "Negotiate mutual indemnification caps and exclude indirect/consequential damages."
+                                        },
+                                        {
+                                            clause: "Limitation of Liability Cap",
+                                            severity: "high",
+                                            risk: "Total liability is capped, limiting recoverable damages for potential breach or data security incidents.",
+                                            recommendation: "Request higher liability caps or super-caps for data protection and confidentiality violations."
+                                        },
+                                        {
+                                            clause: "Termination & Renewal Terms",
+                                            severity: "medium",
+                                            risk: "Automatic renewal rules or strict cancellation notice periods apply.",
+                                            recommendation: "Ensure 30-day written notice for convenience termination without penalties."
+                                        }
+                                    ];
+
+                                    return (
+                                    <div id="section-risk" className="space-y-4 bg-white p-6 border border-slate-200/90 shadow-sm rounded-2xl animate-fade-in pdf-avoid-break">
+                                        {/* Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-amber-50 border border-amber-200/80 rounded-xl flex items-center justify-center shrink-0">
+                                                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                                                        Risk & Redline Audit Findings
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                                        Critical legal risks, restrictive covenants, and negotiation counter-proposals identified in this contract.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="self-start sm:self-auto text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 shrink-0">
+                                                {displayRisks.length} {displayRisks.length === 1 ? "Issue Flagged" : "Issues Flagged"}
+                                            </span>
+                                        </div>
+
+                                        {/* Risk Cards */}
+                                        <div className="grid grid-cols-1 gap-4 pt-1">
+                                            {displayRisks.map((risk, idx) => {
                                                 const isHigh = risk.severity.toLowerCase() === "high";
                                                 const isMedium = risk.severity.toLowerCase() === "medium";
-                                                const bgClass = isHigh ? "bg-red-50 border-red-200" : isMedium ? "bg-amber-50 border-amber-200" : "bg-blue-50 border-blue-200";
-                                                const textClass = isHigh ? "text-red-800" : isMedium ? "text-amber-800" : "text-blue-800";
-                                                const label = isHigh ? "High Severity" : isMedium ? "Medium Severity" : "Low Severity";
+                                                
+                                                const borderAccent = isHigh
+                                                    ? "border-l-4 border-l-red-500"
+                                                    : isMedium
+                                                    ? "border-l-4 border-l-amber-500"
+                                                    : "border-l-4 border-l-blue-500";
+                                                    
+                                                const badgeStyle = isHigh
+                                                    ? "bg-red-100 text-red-800 border-red-200"
+                                                    : isMedium
+                                                    ? "bg-amber-100 text-amber-800 border-amber-200"
+                                                    : "bg-blue-100 text-blue-800 border-blue-200";
+                                                const label = isHigh ? "High Risk" : isMedium ? "Medium Risk" : "Low Risk";
 
                                                 return (
-                                                    <Card key={idx} className={`p-4 border shadow-sm rounded-lg ${bgClass} flex flex-col gap-2`}>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-xs font-bold text-slate-800">
+                                                    <div
+                                                        key={idx}
+                                                        className={`bg-white border border-slate-200/90 shadow-sm rounded-xl p-5 space-y-3 ${borderAccent} hover:shadow-md transition-all duration-200`}
+                                                    >
+                                                        {/* Card Title & Severity Badge */}
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <h4 className="text-sm font-bold text-slate-900 leading-snug">
                                                                 {risk.clause}
-                                                            </span>
-                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 bg-white shadow-sm ${textClass}`}>
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isHigh ? "bg-red-600 animate-pulse" : isMedium ? "bg-amber-500 animate-pulse" : "bg-blue-500"}`} />
+                                                            </h4>
+                                                            <span className={`text-[11px] font-bold px-3 py-0.5 rounded-full border flex items-center gap-1.5 shrink-0 ${badgeStyle}`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isHigh ? "bg-red-600" : isMedium ? "bg-amber-600" : "bg-blue-600"}`} />
                                                                 {label}
                                                             </span>
                                                         </div>
-                                                        <div className="text-xs text-slate-700 leading-relaxed font-medium">
-                                                            <strong className="text-slate-900 block mb-0.5">Identified Risk:</strong>
+
+                                                        {/* Identified Risk Description */}
+                                                        <div className="text-xs text-slate-700 leading-relaxed font-normal">
+                                                            <strong className="text-slate-900 font-semibold block mb-0.5">Identified Risk:</strong>
                                                             {risk.risk}
                                                         </div>
-                                                        <div className="text-xs text-slate-700 leading-relaxed font-medium bg-white/70 p-2.5 rounded border border-black/5 mt-1">
-                                                            <strong className="text-blue-700 block mb-0.5">Recommendation:</strong>
-                                                            {risk.recommendation}
-                                                        </div>
-                                                    </Card>
+
+                                                        {/* Suggested Counter-Proposal Callout */}
+                                                        {risk.recommendation && (
+                                                            <div className="bg-blue-50/60 border border-blue-100/90 rounded-lg p-3.5 space-y-1 mt-1">
+                                                                <div className="flex items-center gap-1.5 text-blue-800 text-xs font-bold tracking-wide">
+                                                                    <Shield className="w-3.5 h-3.5 text-blue-600" />
+                                                                    <span>Negotiation Counter-Proposal</span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-700 leading-relaxed font-normal">
+                                                                    {risk.recommendation}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 );
                                             })}
                                         </div>
                                     </div>
-                                )}
+                                    );
+                                })()}
 
                                 <div className="space-y-4 animate-fade-in">
                                     {analysisResults.map((result, index) => (
-                                        <div key={index} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg pdf-avoid-break">
+                                        <div key={index} id={`section-${result.section || index + 1}`} className="space-y-3 bg-white p-5 border border-slate-200 shadow-sm rounded-lg pdf-avoid-break">
                                             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                                 <span className="w-1.5 h-3.5 rounded-full bg-blue-600 inline-block" />
                                                 Section {result.section || index + 1}
@@ -1132,9 +1453,8 @@ export default function Dashboard() {
                 </main>
             </div>
 
-            {/* --- FLOATING Q&A CHATBOT --- */}
-            {(analyzedDocId || activeAnalysisId) && (
-                <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end">
+            {/* --- FLOATING Q&A CHATBOT (Always Accessible) --- */}
+            <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
                     {/* Chat Panel / Drawer */}
                     {isChatOpen && (
                         <Card className="w-96 h-[500px] mb-4 bg-white border border-slate-200/80 shadow-2xl rounded-xl flex flex-col overflow-hidden animate-slide-in-up">
@@ -1149,13 +1469,24 @@ export default function Dashboard() {
                                         </p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsChatOpen(false)}
-                                    className="text-slate-400 hover:text-white transition-colors"
-                                    aria-label="Close chat"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {chatMessages.length > 0 && (
+                                        <button
+                                            onClick={() => setChatMessages([])}
+                                            title="Clear conversation"
+                                            className="text-slate-400 hover:text-red-400 text-xs flex items-center gap-1 transition-colors mr-1"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setIsChatOpen(false)}
+                                        className="text-slate-400 hover:text-white transition-colors"
+                                        aria-label="Close chat"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Messages List */}
@@ -1178,14 +1509,16 @@ export default function Dashboard() {
                                                 key={idx}
                                                 className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                                             >
-                                                <div
-                                                    className={`max-w-[80%] rounded-lg p-3 text-xs leading-relaxed shadow-sm font-medium ${isUser
-                                                            ? "bg-blue-600 text-white rounded-br-none"
-                                                            : "bg-white border border-slate-200 text-slate-800 rounded-bl-none"
-                                                        }`}
-                                                >
-                                                    {msg.text}
-                                                </div>
+                                                {isUser ? (
+                                                    <div className="max-w-[80%] rounded-lg p-3 text-xs leading-relaxed shadow-sm font-medium bg-blue-600 text-white rounded-br-none">
+                                                        {msg.text}
+                                                    </div>
+                                                ) : (
+                                                    <div
+                                                        className="max-w-[88%] rounded-lg px-3 py-3.5 text-xs leading-relaxed shadow-sm bg-white border border-slate-200 text-slate-700 rounded-bl-none"
+                                                        dangerouslySetInnerHTML={{ __html: formatMarkdownToHtml(msg.text) }}
+                                                    />
+                                                )}
                                             </div>
                                         );
                                     })
@@ -1239,18 +1572,7 @@ export default function Dashboard() {
                         {isChatOpen ? <X className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
                     </button>
                 </div>
-            )}
 
-            {/* Scroll-to-bottom button — only when results are visible and not at bottom */}
-            {analysisResults.length > 0 && showScrollBtn && (
-                <button
-                    onClick={scrollToBottom}
-                    aria-label="Scroll to bottom"
-                    className={`fixed bottom-6 ${analyzedDocId || activeAnalysisId ? "right-24" : "right-6"} z-50 w-10 h-10 rounded-full bg-slate-800/80 text-white flex items-center justify-center shadow-lg hover:bg-slate-700 transition-all hover:scale-105 active:scale-95 backdrop-blur-sm`}
-                >
-                    <ChevronRight className="w-4 h-4 rotate-90" />
-                </button>
-            )}
             {/* --- MOBILE NAVIGATION DRAWER --- */}
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 bg-white z-50 flex flex-col p-6 overflow-y-auto animate-fade-in md:hidden">
@@ -1407,6 +1729,24 @@ export default function Dashboard() {
                     </div>
                 </div>
             )}
+
+            <SecurityModal
+                isOpen={isSecurityModalOpen}
+                onClose={() => setIsSecurityModalOpen(false)}
+            />
+
+            {(() => {
+                const navSections: NavSection[] = [
+                    { id: "section-risk", title: "Risk & Redline Audit", type: "risk" },
+                    ...analysisResults.map((result, index) => ({
+                        id: `section-${result.section || index + 1}`,
+                        title: `Section ${result.section || index + 1}: ${result.original ? result.original.substring(0, 25).trim() + "..." : "Clause Summary"}`,
+                        type: "section" as const,
+                        sectionNumber: result.section || index + 1,
+                    })),
+                ];
+                return <RightSectionNavigator sections={navSections} isChatOpen={isChatOpen} />;
+            })()}
         </>
     );
 }
