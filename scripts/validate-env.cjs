@@ -36,13 +36,21 @@ const optionalVars = {
 }
 
 function validateEnv(env, component) {
-  const envFile = component === 'frontend' ? `.env` : `backend/.env`;
-  if (!fs.existsSync(path.join(projectRoot, envFile))) {
-    logError(`Error: ${envFile} file not found. Please create it. You can use ${envFile}.example as a template.`);
+  let envPath = component === 'frontend' ? '.env' : 'backend/.env';
+  if (!fs.existsSync(path.join(projectRoot, envPath))) {
+    if (component === 'frontend' && fs.existsSync(path.join(projectRoot, 'frontend/.env'))) {
+      envPath = 'frontend/.env';
+    } else if (component === 'backend' && fs.existsSync(path.join(projectRoot, '.env'))) {
+      envPath = '.env';
+    }
+  }
+
+  if (!fs.existsSync(path.join(projectRoot, envPath))) {
+    logError(`Error: ${envPath} file not found. Please create it.`);
     return false;
   }
   
-  require('dotenv').config({ path: path.join(projectRoot, envFile) });
+  require('dotenv').config({ path: path.join(projectRoot, envPath) });
 
   let allVarsPresent = true;
   const missingVars = [];
