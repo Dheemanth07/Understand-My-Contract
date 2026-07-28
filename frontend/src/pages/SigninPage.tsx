@@ -1,6 +1,6 @@
 // src/pages/SigninPage.tsx
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,7 +14,7 @@ export default function SigninPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const { signIn, session } = UserAuth();
+    const { signIn, session, loading: authLoading } = UserAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
 
@@ -24,13 +24,21 @@ export default function SigninPage() {
         }
     }, [session, navigate]);
 
+    if (session) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    if (authLoading) {
+        return null;
+    }
+
     const handleSignin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
             const { error } = await signIn(email, password);
             if (error) throw error;
-            navigate("/dashboard");
+            navigate("/dashboard", { replace: true });
         } catch (err: any) {
             toast({
                 title: "Error",

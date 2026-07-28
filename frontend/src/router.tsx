@@ -5,6 +5,7 @@ import { createBrowserRouter } from "react-router-dom";
 import Index from "./pages/Index";
 import SigninPage from "./pages/SigninPage";
 import SignupPage from "./pages/SignupPage";
+import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./routes/Dashboard";
 import PrivateRoute from "./components/PrivateRoute";
 import HistoryView from "./pages/HistoryView";
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     { path: "/", element: <Index /> },
     { path: "/signin", element: <SigninPage /> },
     { path: "/signup", element: <SignupPage /> },
+    { path: "/auth/callback", element: <AuthCallback /> },
     {
         path: "/dashboard",
         element: (

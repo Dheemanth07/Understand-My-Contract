@@ -1,6 +1,6 @@
 // src/pages/SignupPage.tsx
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Navigate } from "react-router-dom";
 import { UserAuth } from "../context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import Logo from "@/components/Logo";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 export default function SignupPage() {
-    const { session } = UserAuth();
+    const { session, loading: authLoading } = UserAuth();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
         firstName: "",
@@ -27,6 +27,14 @@ export default function SignupPage() {
             navigate("/dashboard", { replace: true });
         }
     }, [session, navigate]);
+
+    if (session) {
+        return <Navigate to="/dashboard" replace />;
+    }
+
+    if (authLoading) {
+        return null;
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
