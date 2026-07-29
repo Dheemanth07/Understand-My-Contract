@@ -69,8 +69,8 @@ const uploadLimiter = rateLimit({
 });
 
 // Mount routers
-const uploadRouter = require("./features/upload/routes/uploadRoutes");
-const historyRouter = require("./features/history/routes/historyRoutes");
+const uploadRouter = require("./features/upload/upload.routes");
+const historyRouter = require("./features/history/history.routes");
 
 app.use("/upload", uploadLimiter, uploadRouter);
 app.use("/history", historyRouter);

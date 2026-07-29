@@ -1,7 +1,7 @@
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const axios = require("axios");
-const { IGNORED_WORDS, LEGAL_DICTIONARY } = require("../../glossaryData");
+const { IGNORED_WORDS, LEGAL_DICTIONARY } = require("../shared/glossary/glossaryData");
 
 const langMap = { eng: "en", kan: "kn", hin: "hi", tam: "ta", tel: "te" };
 

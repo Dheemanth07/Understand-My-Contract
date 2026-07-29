@@ -1,4 +1,4 @@
-const { LEGAL_DICTIONARY } = require("../../../shared/glossary/glossaryData");
+const { LEGAL_DICTIONARY } = require("../../shared/glossary/glossaryData");
 const {
     extractTextFromFile,
     anonymizePII,
@@ -10,10 +10,10 @@ const {
     lookupDefinition,
     simplifyAndTranslateWithGemini,
     analyzeRisksWithGemini,
-} = require("../../../shared/ai/processing");
+} = require("../../shared/ai/processing");
 
-const AnalysisRepository = require("../../../infrastructure/repositories/AnalysisRepository");
-const { getUserFromToken } = require("../../../utils/auth");
+const AnalysisRepository = require("./upload.repository");
+const { getUserFromToken } = require("../../utils/auth");
 
 async function processContractInBackground(analysisId, text, lang) {
     try {
@@ -208,4 +208,3 @@ async function handleUpload(req, res) {
 }
 
 module.exports = { handleUpload };
-

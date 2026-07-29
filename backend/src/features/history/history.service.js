@@ -1,7 +1,7 @@
-const AnalysisRepository = require("../../../infrastructure/repositories/AnalysisRepository");
-const { getUserFromToken } = require("../../../utils/auth");
-const supabase = require("../../../utils/supabaseClient");
-const { callAI } = require("../../../services/processing");
+const AnalysisRepository = require("./history.repository");
+const { getUserFromToken } = require("../../utils/auth");
+const supabase = require("../../utils/supabaseClient");
+const { callAI } = require("../../services/processing");
 
 async function list(req, res) {
     try {
@@ -46,7 +46,7 @@ async function getActiveProcessing(req, res) {
         if (!doc) return res.json(null);
 
         if (!doc.risks || doc.risks.length === 0) {
-            const { analyzeRisksWithGemini } = require("../../../services/processing");
+            const { analyzeRisksWithGemini } = require("../../services/processing");
             doc.risks = await analyzeRisksWithGemini(doc.text || "");
         }
 
@@ -72,7 +72,7 @@ async function getById(req, res) {
 
         // ONLY compute risks if doc is ALREADY marked as completed by worker but risks are missing
         if (doc.status === "completed" && (!doc.risks || doc.risks.length === 0)) {
-            const { analyzeRisksWithGemini } = require("../../../services/processing");
+            const { analyzeRisksWithGemini } = require("../../services/processing");
             doc.risks = await analyzeRisksWithGemini(doc.sections.map(s => s.original).join("\n\n") || "");
             await AnalysisRepository.setCompleted(id, doc.glossary || {}, doc.risks);
         }
@@ -235,4 +235,3 @@ async function stop(req, res) {
 }
 
 module.exports = { list, getActiveProcessing, getById, deleteById, chat, generalChat, getMergedGlossary, stop };
-

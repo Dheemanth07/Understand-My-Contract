@@ -9,7 +9,7 @@ const {
     generalChatHandler,
     getMergedGlossaryHandler,
     stopHandler,
-} = require("../controller/HistoryController");
+} = require("./history.controller");
 
 const router = express.Router();
 router.get("/", listHandler);
@@ -22,4 +22,3 @@ router.delete("/:id", deleteHandler);
 router.post("/:id/stop", stopHandler);
 
 module.exports = router;
-

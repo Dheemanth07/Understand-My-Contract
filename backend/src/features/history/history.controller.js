@@ -1,35 +1,35 @@
-const HistoryService = require("../service/HistoryService");
+const historyService = require("./history.service");
 
 async function listHandler(req, res) {
-    return HistoryService.list(req, res);
+    return historyService.list(req, res);
 }
 
 async function getByIdHandler(req, res) {
-    return HistoryService.getById(req, res);
+    return historyService.getById(req, res);
 }
 
 async function deleteHandler(req, res) {
-    return HistoryService.deleteById(req, res);
+    return historyService.deleteById(req, res);
 }
 
 async function chatHandler(req, res) {
-    return HistoryService.chat(req, res);
+    return historyService.chat(req, res);
 }
 
 async function getMergedGlossaryHandler(req, res) {
-    return HistoryService.getMergedGlossary(req, res);
+    return historyService.getMergedGlossary(req, res);
 }
 
 async function stopHandler(req, res) {
-    return HistoryService.stop(req, res);
+    return historyService.stop(req, res);
 }
 
 async function getActiveHandler(req, res) {
-    return HistoryService.getActiveProcessing(req, res);
+    return historyService.getActiveProcessing(req, res);
 }
 
 async function generalChatHandler(req, res) {
-    return HistoryService.generalChat(req, res);
+    return historyService.generalChat(req, res);
 }
 
 module.exports = {
@@ -42,4 +42,3 @@ module.exports = {
     getMergedGlossaryHandler,
     stopHandler,
 };
-
