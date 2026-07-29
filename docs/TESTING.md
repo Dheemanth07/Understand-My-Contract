@@ -1,63 +1,87 @@
-# Testing Overview
-This document outlines the testing strategy for the "Understand My Contract" application, which includes unit, integration, and end-to-end (E2E) tests to ensure code quality, functionality, and reliability.
+# Testing Documentation & Inventory
 
-## Test Types
+This document serves as the single source of truth for testing across **Understand My Contract**. It covers the test architecture, backend & frontend unit/integration test suites, E2E testing workflows, and local execution guidelines.
 
-### Unit Tests
-Unit tests focus on individual components and functions in isolation. We use Jest and React Testing Library for the frontend, and Jest with Supertest for the backend.
+---
 
-- **Location**: 
-  - Frontend: `src/__tests__/`
-  - Backend: `backend/__tests__/`
-- **Coverage**: We enforce a **70% minimum** threshold for branches, functions, lines, and statements.
-- **Commands**:
-  - `npm test`: Run all unit tests for the respective (frontend/backend) project.
-  - `npm run test:watch`: Run tests in watch mode.
-  - `npm run test:coverage`: Generate a coverage report.
+## 1. Overview & Test Architecture
 
-### End-to-End (E2E) Tests
-E2E tests simulate full user workflows from start to finish. We use Playwright to run tests across multiple browsers.
+- **Backend Test Framework**: Jest with `mongodb-memory-server` and `supertest`.
+- **Frontend Test Framework**: Jest with `@testing-library/react` and `jsdom`.
+- **E2E Test Framework**: Playwright across Chromium, Firefox, and WebKit.
+- **Coverage Requirement**: Minimum 70% threshold across lines, functions, branches, and statements.
 
-- **Location**: `e2e/tests/`
-- **Browsers**: Chromium, Firefox, WebKit.
-- **Commands**:
-  - `npm run test:e2e`: Run all E2E tests headlessly.
-  - `npm run test:e2e:ui`: Run E2E tests with the Playwright UI.
-  - `npm run test:e2e:headed`: Run E2E tests in headed mode.
+---
 
-## Coverage Requirements
-The 70% coverage threshold is automatically enforced in our CI/CD pipeline, as configured in `jest.config.js` and `backend/jest.config.js`. If a pull request causes coverage to drop below this limit, the build will fail.
+## 2. Test Execution Commands
 
-To view the coverage report locally, run `npm run test:coverage` in either the root or `backend/` directory and open the `coverage/lcov-report/index.html` file in your browser.
+### Monorepo Root Scripts
+```bash
+# Run backend tests
+npm run test:backend
 
-## Running Tests Locally
-1. **Environment Setup**: Ensure you have a `.env` file in the root directory and `backend/` directory. Use the `.env.example` files as a template.
-2. **Install Dependencies**: Run `npm install` in both the root and `backend/` directories.
-3. **Run Unit Tests**:
-   - `npm test` (for frontend)
-   - `cd backend && npm test` (for backend)
-4. **Run E2E Tests**:
-   - You may need a local instance of MongoDB running.
-   - Run `npm run test:e2e` from the root directory.
+# Run frontend tests
+npm run test:frontend
 
-## CI/CD Testing
-All tests are automatically executed on every push and pull request to `main` and `develop` branches via GitHub Actions (`.github/workflows/ci.yml`). The pipeline includes jobs for:
-- Linting and type-checking
-- Unit testing (frontend and backend)
-- E2E testing (on a matrix of browsers)
-- Build validation
+# Run frontend typecheck
+npm run typecheck:frontend
 
-Test results, logs, and artifacts (like Playwright traces) are uploaded for inspection on failed runs.
+# Run full CI suite locally
+npm run ci --prefix backend
+npm run ci --prefix frontend
+```
 
-## Writing Tests
-When adding new features, please include corresponding tests.
-- **Unit Tests**: Follow existing patterns in files like `src/__tests__/lib/utils.test.ts` or `backend/__tests__/helpers/summarizeSection.test.js`.
-- **E2E Tests**: Use established patterns from `e2e/tests/auth.spec.ts`.
+### Backend Commands (`cd backend`)
+```bash
+npm test                # Run unit & endpoint tests
+npm run test:watch      # Watch mode
+npm run test:coverage   # Coverage report
+npm run ci              # Validate environment & execute CI test suite
+```
 
-## Test Utilities
-We have several test helpers and mocks available to streamline test creation:
-- **Frontend**: `src/__tests__/utils/` (e.g., `testHelpers.tsx`, `supabaseMock.ts`)
-- **Backend**: `backend/testUtils/` (e.g., `testHelpers.js`, `mocks.js`)
-- **E2E**: `e2e/utils/` and `e2e/fixtures/` (e.g., API helpers, authentication fixtures)
+### Frontend Commands (`cd frontend`)
+```bash
+npm test                # Run unit & component tests
+npm run test:e2e        # Run Playwright E2E tests
+npm run typecheck       # TypeScript validation
+```
 
-Refer to these directories for utilities that can simplify your test setup.
+---
+
+## 3. Backend Test Suite Inventory
+
+The backend test suite is located in `backend/__tests__/` and covers helper functions, REST API endpoints, and end-to-end user workflows.
+
+### Endpoint Tests (`backend/__tests__/endpoints/`)
+- `upload.test.js`: Validates `/upload` contract file processing, PII anonymization, and background analysis dispatching.
+- `history.test.js`: Validates `/history` contract list and paginated history retrieval.
+- `historyById.test.js`: Validates `/history/:id` detail lookup and heartbeat active updates.
+- `delete.test.js`: Validates `/history/:id` deletion of records and linked Supabase storage entries.
+- `stop.test.js`: Validates `/history/:id/stop` request cancellation and partial analysis persistence.
+- `compare.test.js`: Validates multi-contract comparison logic.
+- `auth.test.js`: Validates Bearer token extraction and Supabase JWT authentication.
+
+### Helper & Utility Tests (`backend/__tests__/helpers/`)
+- `extractTextFromFile.test.js`: File extraction for PDF (`pdf-parse`), DOCX (`mammoth`), and TXT formats.
+- `extractJargon.test.js`: Legal terminology extraction and stop-word filtering.
+- `lookupDefinition.test.js`: Legal term dictionary and external API lookup fallbacks.
+- `detectLanguage.test.js`: Language detection logic.
+- `summarizeSection.test.js`: Summarization logic.
+- `translate.test.js`: Multi-language translation helper.
+- `getUserFromToken.test.js`: Auth utility tests.
+
+---
+
+## 4. End-to-End (E2E) Workflows
+
+Located in `frontend/e2e/`, Playwright E2E tests simulate full user interactions:
+- **Authentication**: Sign in, sign up, session persistence.
+- **Contract Upload & Simplification**: File upload, summary generation, jargon dictionary lookup.
+- **History & Comparison**: Contract history browsing, side-by-side legal risk comparison.
+
+---
+
+## 5. Test Utilities & Fixtures
+
+- **Backend Mocks**: `backend/testUtils/mocks.js` & `backend/testUtils/testHelpers.js`
+- **Database Sandbox**: `mongodb-memory-server` provides an isolated, fast, in-memory MongoDB instance for all tests without requiring external database dependencies.
