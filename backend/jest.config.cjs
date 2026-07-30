@@ -10,6 +10,7 @@ module.exports = {
     '!**/__tests__/**',
     '!**/coverage/**',
     '!jest.config.js',
+    '!jest.config.cjs',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
