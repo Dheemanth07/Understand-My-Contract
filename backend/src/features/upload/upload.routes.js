@@ -1,5 +1,6 @@
-const express = require("express");
-const multer = require("multer");
+import express from "express";
+import multer from "multer";
+import { uploadHandler } from "./upload.controller.js";
 
 const upload = multer({
     limits: {
@@ -7,9 +8,8 @@ const upload = multer({
     }
 });
 
-const { uploadHandler } = require("./upload.controller");
-
 const router = express.Router();
 router.post("/", upload.single("file"), uploadHandler);
 
-module.exports = router;
+export default router;
+

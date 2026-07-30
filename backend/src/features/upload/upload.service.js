@@ -1,5 +1,5 @@
-const { LEGAL_DICTIONARY } = require("../../shared/glossary/glossaryData");
-const {
+import { LEGAL_DICTIONARY } from "../../shared/glossary/glossaryData.js";
+import {
     extractTextFromFile,
     anonymizePII,
     splitIntoSections,
@@ -10,10 +10,10 @@ const {
     lookupDefinition,
     simplifyAndTranslateWithGemini,
     analyzeRisksWithGemini,
-} = require("../../shared/ai/processing");
+} from "../../shared/ai/processing.js";
 
-const AnalysisRepository = require("./upload.repository");
-const { getUserFromToken } = require("../../utils/auth");
+import AnalysisRepository from "./upload.repository.js";
+import { getUserFromToken } from "../../utils/auth.js";
 
 async function processContractInBackground(analysisId, text, lang) {
     try {
@@ -207,4 +207,4 @@ async function handleUpload(req, res) {
     }
 }
 
-module.exports = { handleUpload };
+export { handleUpload };

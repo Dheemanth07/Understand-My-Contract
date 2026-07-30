@@ -1,3 +1,4 @@
-const AnalysisRepository = require("../../infrastructure/repositories/AnalysisRepository");
+import AnalysisRepository from "../../infrastructure/repositories/AnalysisRepository.js";
 
-module.exports = AnalysisRepository;
+export default AnalysisRepository;
+

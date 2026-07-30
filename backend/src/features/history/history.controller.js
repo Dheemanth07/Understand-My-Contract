@@ -1,4 +1,4 @@
-const historyService = require("./history.service");
+import * as historyService from "./history.service.js";
 
 async function listHandler(req, res) {
     return historyService.list(req, res);
@@ -32,7 +32,7 @@ async function generalChatHandler(req, res) {
     return historyService.generalChat(req, res);
 }
 
-module.exports = {
+export {
     listHandler,
     getActiveHandler,
     getByIdHandler,
@@ -42,3 +42,4 @@ module.exports = {
     getMergedGlossaryHandler,
     stopHandler,
 };
+

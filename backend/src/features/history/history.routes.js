@@ -1,6 +1,6 @@
-const express = require("express");
+import express from "express";
 
-const {
+import {
     listHandler,
     getActiveHandler,
     getByIdHandler,
@@ -9,7 +9,7 @@ const {
     generalChatHandler,
     getMergedGlossaryHandler,
     stopHandler,
-} = require("./history.controller");
+} from "./history.controller.js";
 
 const router = express.Router();
 router.get("/", listHandler);
@@ -21,4 +21,5 @@ router.post("/:id/chat", chatHandler);
 router.delete("/:id", deleteHandler);
 router.post("/:id/stop", stopHandler);
 
-module.exports = router;
+export default router;
+
