@@ -1,5 +1,6 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+import { jest, beforeAll, afterAll, beforeEach, afterEach } from '@jest/globals';
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Environment variables for testing
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://test.supabase.co';
@@ -52,3 +53,4 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
+

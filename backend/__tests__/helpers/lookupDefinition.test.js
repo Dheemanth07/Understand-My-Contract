@@ -1,53 +1,57 @@
+import { jest } from '@jest/globals';
+
+jest.unstable_mockModule('axios', () => ({
+  default: {
+    get: jest.fn(async (url) => {
+      // Mock dictionary API responses
+      if (url.includes('test')) {
+        return {
+          data: [
+            {
+              meanings: [
+                {
+                  definitions: [
+                    {
+                      definition: 'A procedure intended to establish the quality, performance, or reliability of something.',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+      }
+      if (url.includes('agreement')) {
+        return {
+          data: [
+            {
+              meanings: [
+                {
+                  definitions: [
+                    {
+                      definition: 'The arrangement or understanding between two or more parties.',
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        };
+      }
+      // Throw for unknown words
+      throw new Error('Not found');
+    }),
+    post: jest.fn(async () => ({ data: [] })),
+  },
+}));
+
+const axios = (await import('axios')).default;
+const { lookupDefinition } = await import('../../server.js');
+const { resetAllMocks } = await import('../../testUtils/mocks.js');
+
 /**
  * Unit tests for lookupDefinition helper function
  */
-
-// Mock axios before importing the function
-jest.mock('axios', () => ({
-  get: jest.fn(async (url) => {
-    // Mock dictionary API responses
-    if (url.includes('test')) {
-      return {
-        data: [
-          {
-            meanings: [
-              {
-                definitions: [
-                  {
-                    definition: 'A procedure intended to establish the quality, performance, or reliability of something.',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    }
-    if (url.includes('agreement')) {
-      return {
-        data: [
-          {
-            meanings: [
-              {
-                definitions: [
-                  {
-                    definition: 'The arrangement or understanding between two or more parties.',
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      };
-    }
-    // Throw for unknown words
-    throw new Error('Not found');
-  }),
-}));
-
-const { lookupDefinition } = require('../../server');
-const axios = require('axios');
-const { resetAllMocks } = require('../../testUtils/mocks');
 
 describe('lookupDefinition', () => {
   beforeEach(() => {

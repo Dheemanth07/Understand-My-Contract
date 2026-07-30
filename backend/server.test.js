@@ -1,6 +1,6 @@
-const http = require('http');
-const mongoose = require('mongoose');
-const { app } = require('./server');
+import http from 'http';
+import mongoose from 'mongoose';
+import { app } from './server.js';
 
 async function startTestServer() {
   return new Promise((resolve, reject) => {
@@ -25,4 +25,5 @@ async function stopTestServer(server) {
   });
 }
 
-module.exports = { startTestServer, stopTestServer };
+export { startTestServer, stopTestServer };
+

@@ -1,13 +1,6 @@
-/**
- * Integration tests for DELETE /history/:id endpoint
- */
+import { jest } from '@jest/globals';
 
-const request = require('supertest');
-const { app, Analysis } = require('../../server');
-const mongoose = require('mongoose');
-
-// Mock Supabase
-jest.mock('@supabase/supabase-js', () => ({
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
     auth: {
       getUser: jest.fn(async (token) => {
@@ -33,6 +26,11 @@ jest.mock('@supabase/supabase-js', () => ({
     })),
   })),
 }));
+
+const request = (await import('supertest')).default;
+const { app, Analysis } = await import('../../server.js');
+const mongoose = (await import('mongoose')).default;
+const { createClient } = await import('@supabase/supabase-js');
 
 describe('DELETE /history/:id', () => {
   let testDoc;
@@ -191,7 +189,6 @@ describe('DELETE /history/:id', () => {
 
     it('should handle Supabase deletion errors gracefully', async () => {
       // Mock Supabase delete to fail
-      const { createClient } = require('@supabase/supabase-js');
       const mockClient = createClient();
       mockClient.from().delete().match.mockRejectedValueOnce(new Error('Supabase error'));
 

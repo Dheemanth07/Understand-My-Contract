@@ -3,6 +3,8 @@
  * Mirrors frontend patterns from src/__tests__/utils/supabaseMock.ts and apiMocks.ts
  */
 
+import { jest } from '@jest/globals';
+
 // ============================================================================
 // SUPABASE MOCK
 // ============================================================================
@@ -255,7 +257,7 @@ function resetAllMocks() {
 // EXPORTS
 // ============================================================================
 
-module.exports = {
+export {
   // Supabase
   mockSupabaseClient,
   setMockSupabaseAuthUser,
@@ -287,3 +289,37 @@ module.exports = {
   // All
   resetAllMocks,
 };
+
+export default {
+  // Supabase
+  mockSupabaseClient,
+  setMockSupabaseAuthUser,
+  setMockSupabaseAuthError,
+  setMockTokenUser,
+  resetSupabaseMocks,
+
+  // Mongoose
+  mockAnalysisModel,
+  resetMongooseMocks,
+
+  // Axios
+  mockAxios,
+  resetAxiosMocks,
+
+  // File Processing
+  mockPdfParse,
+  mockMammoth,
+  resetFileProcessingMocks,
+
+  // Transformers
+  mockTransformersPipeline,
+  resetTransformersMocks,
+
+  // Franc
+  mockFranc,
+  resetFrancMocks,
+
+  // All
+  resetAllMocks,
+};
+

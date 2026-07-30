@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
+
 /**
  * Unit tests for splitIntoSections helper function
  */
 
-const { splitIntoSections } = require('../../server');
-const { resetAllMocks } = require('../../testUtils/mocks');
+import { splitIntoSections } from '../../server.js';
+import { resetAllMocks } from '../../testUtils/mocks.js';
 
 describe('splitIntoSections', () => {
   beforeEach(() => {

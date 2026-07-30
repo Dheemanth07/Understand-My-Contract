@@ -1,19 +1,16 @@
-/**
- * Integration tests for POST /upload endpoint
- */
+import { jest } from '@jest/globals';
 
-const request = require('supertest');
-const { app, Analysis } = require('../../server');
-
-// Mock external dependencies
-jest.mock('axios');
-jest.mock('franc-min');
-jest.mock('@xenova/transformers');
-jest.mock('pdf-parse', () => jest.fn());
-jest.mock('mammoth');
-
-// Mock Supabase
-jest.mock('@supabase/supabase-js', () => ({
+jest.unstable_mockModule('axios', () => ({
+  default: { post: jest.fn(async () => ({ data: [] })), get: jest.fn(async () => ({ data: [] })) }
+}));
+jest.unstable_mockModule('franc-min', () => ({ default: jest.fn(() => 'eng'), franc: jest.fn(() => 'eng') }));
+jest.unstable_mockModule('@xenova/transformers', () => ({ pipeline: jest.fn() }));
+jest.unstable_mockModule('pdf-parse/lib/pdf-parse.js', () => ({ default: jest.fn() }));
+jest.unstable_mockModule('mammoth', () => ({
+  extractRawText: jest.fn(),
+  default: { extractRawText: jest.fn() },
+}));
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
     auth: {
       getUser: jest.fn(async (token) => {
@@ -33,6 +30,9 @@ jest.mock('@supabase/supabase-js', () => ({
     })),
   })),
 }));
+
+const request = (await import('supertest')).default;
+const { app, Analysis } = await import('../../server.js');
 
 describe('POST /upload', () => {
   beforeEach(() => {
@@ -101,7 +101,8 @@ describe('POST /upload', () => {
       expect([400, 500]).toContain(res.status);
     });
   });
-});  describe('Successful Upload with JSON Response', () => {
+
+  describe('Successful Upload with JSON Response', () => {
     it('should return JSON with Content-Type header', async () => {
       const res = await request(app)
         .post('/upload')
@@ -205,3 +206,4 @@ describe('POST /upload', () => {
       expect([400, 500]).toContain(res.status);
     });
   });
+});

@@ -1,14 +1,15 @@
-/**
- * Unit tests for summarizeSection helper function
- */
+import { jest } from '@jest/globals';
 
-jest.mock('axios', () => ({
-  post: jest.fn(async () => ({ data: [{ summary_text: 'Mock summary text' }] })),
+jest.unstable_mockModule('axios', () => ({
+  default: {
+    post: jest.fn(async () => ({ data: [{ summary_text: 'Mock summary text' }] })),
+    get: jest.fn(async () => ({ data: [] })),
+  },
 }));
 
-const { summarizeSection } = require('../../server');
-const axios = require('axios');
-const { resetAllMocks, mockAxios } = require('../../testUtils/mocks');
+const axios = (await import('axios')).default;
+const { summarizeSection } = await import('../../server.js');
+const { resetAllMocks, mockAxios } = await import('../../testUtils/mocks.js');
 
 // A reusable long-form text that clears the 15-word short-text bypass guard.
 const LONG_TEXT =

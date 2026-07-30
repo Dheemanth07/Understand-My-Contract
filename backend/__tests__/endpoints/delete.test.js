@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
+
 /**
  * Integration tests for DELETE /analysis/:analysisId endpoint
  */
 
-const { createMockAuthHeader } = require('../../testUtils/testHelpers');
-const { resetAllMocks } = require('../../testUtils/mocks');
+import { createMockAuthHeader } from '../../testUtils/testHelpers.js';
+import { resetAllMocks } from '../../testUtils/mocks.js';
 
 describe('DELETE /analysis/:analysisId', () => {
   beforeEach(() => {

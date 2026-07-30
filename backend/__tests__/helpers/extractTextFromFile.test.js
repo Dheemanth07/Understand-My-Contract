@@ -1,17 +1,25 @@
+import { jest } from '@jest/globals';
+
+const mockPdfParseFn = jest.fn();
+jest.unstable_mockModule('pdf-parse/lib/pdf-parse.js', () => ({
+  default: mockPdfParseFn,
+}));
+
+const mockMammothObj = { extractRawText: jest.fn() };
+jest.unstable_mockModule('mammoth', () => ({
+  default: mockMammothObj,
+  extractRawText: mockMammothObj.extractRawText,
+}));
+
+const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+const mammoth = (await import('mammoth')).default;
+const { extractTextFromFile } = await import('../../server.js');
+const { createMockFile } = await import('../../testUtils/testHelpers.js');
+const { resetAllMocks } = await import('../../testUtils/mocks.js');
+
 /**
  * Unit tests for extractTextFromFile helper function
  */
-
-// Mock external dependencies before importing the function
-jest.mock('pdf-parse', () => jest.fn());
-jest.mock('mammoth', () => ({ extractRawText: jest.fn() }));
-
-// after mocking we can require normally
-const pdfParse = require('pdf-parse');
-const mammoth = require('mammoth');
-const { extractTextFromFile } = require('../../server');
-const { createMockFile } = require('../../testUtils/testHelpers');
-const { resetAllMocks } = require('../../testUtils/mocks');
 
 describe('extractTextFromFile', () => {
   beforeEach(() => {

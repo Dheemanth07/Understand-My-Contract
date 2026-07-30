@@ -1,8 +1,6 @@
-/**
- * Unit tests for getUserFromToken helper function
- */
+import { jest } from '@jest/globals';
 
-jest.mock('@supabase/supabase-js', () => ({
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
     auth: {
       getUser: jest.fn(async (token) => {
@@ -23,8 +21,13 @@ jest.mock('@supabase/supabase-js', () => ({
   })),
 }));
 
-const { getUserFromToken } = require('../../server');
-const { resetAllMocks } = require('../../testUtils/mocks');
+const { createClient } = await import('@supabase/supabase-js');
+const { getUserFromToken, __setSupabaseClient } = await import('../../src/utils/auth.js');
+const { resetAllMocks } = await import('../../testUtils/mocks.js');
+
+/**
+ * Unit tests for getUserFromToken helper function
+ */
 
 describe('getUserFromToken', () => {
   beforeEach(() => {
@@ -35,205 +38,103 @@ describe('getUserFromToken', () => {
     it('should return user for valid Bearer token', async () => {
       const req = {
         headers: {
-          authorization: 'Bearer valid-token-user123',
+          authorization: 'Bearer valid-token-123',
         },
       };
-
       const user = await getUserFromToken(req);
-      expect(user).not.toBeNull();
-      expect(user.id).toBeDefined();
-      expect(user.email).toBeDefined();
+      expect(user).toBeDefined();
+      expect(user.id).toBe('user-valid');
     });
 
-    it('should extract token from Bearer format', async () => {
+    it('should strip Bearer prefix correctly', async () => {
       const req = {
         headers: {
-          authorization: 'Bearer some-valid-token',
+          authorization: 'Bearer token-abc',
         },
       };
-
       const user = await getUserFromToken(req);
-      expect(user).not.toBeNull();
-    });
-
-    it('should extract and use Bearer token', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer test-token-123',
-        },
-      };
-
-      const user = await getUserFromToken(req);
-      expect(user).not.toBeNull();
-      expect(user.id).toBeDefined();
+      expect(user.id).toBe('user-token');
     });
   });
 
   describe('Invalid Token', () => {
-    it('should return null for invalid token', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer invalid-token',
-        },
-      };
-
-      const user = await getUserFromToken(req);
+    it('should return null for null request', async () => {
+      const user = await getUserFromToken(null);
       expect(user).toBeNull();
     });
 
-    it('should return null for expired token', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer expired-token',
-        },
-      };
-
-      const user = await getUserFromToken(req);
+    it('should return null for request without headers', async () => {
+      const user = await getUserFromToken({});
       expect(user).toBeNull();
     });
 
-    it('should return null for malformed token', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer !!!invalid!!!',
-        },
-      };
-
-      const user = await getUserFromToken(req);
-      // May return null or handle gracefully
-      expect([user, null]).toContain(user);
-    });
-  });
-
-  describe('Missing Authorization Header', () => {
-    it('should return null for missing auth header', async () => {
+    it('should return null for request without authorization header', async () => {
       const req = { headers: {} };
       const user = await getUserFromToken(req);
       expect(user).toBeNull();
     });
 
-    it('should return null for empty auth header', async () => {
-      const req = {
-        headers: {
-          authorization: '',
-        },
-      };
+    it('should return null for empty authorization header', async () => {
+      const req = { headers: { authorization: '' } };
       const user = await getUserFromToken(req);
       expect(user).toBeNull();
     });
 
-    it('should return null for undefined headers', async () => {
-      const req = {};
+    it('should return null for invalid token string', async () => {
+      const req = { headers: { authorization: 'Bearer invalid-token' } };
+      const user = await getUserFromToken(req);
+      expect(user).toBeNull();
+    });
+
+    it('should return null for expired token', async () => {
+      const req = { headers: { authorization: 'Bearer expired-token' } };
       const user = await getUserFromToken(req);
       expect(user).toBeNull();
     });
   });
 
-  describe('Token Format Variations', () => {
-    it('should handle standard Bearer format', async () => {
+  describe('Mock Token Support', () => {
+    it('should handle mock-token-123 specially', async () => {
       const req = {
         headers: {
-          authorization: 'Bearer valid-token-user1',
+          authorization: 'Bearer mock-token-123',
         },
       };
       const user = await getUserFromToken(req);
-      expect(user).not.toBeNull();
-    });
-
-    it('should handle token without Bearer prefix after replace', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer valid-token-user2',
-        },
-      };
-      const user = await getUserFromToken(req);
-      expect(user).not.toBeNull();
-    });
-
-    it('should handle authorization header with extra whitespace', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer  valid-token-user3  ',
-        },
-      };
-      const user = await getUserFromToken(req);
-      // May handle gracefully or fail
-      expect([user, null]).toContain(user);
+      expect(user).toEqual({
+        id: 'mock-user-id',
+        email: 'test_corp_user_123@legalsimplify.com',
+      });
     });
   });
 
-  describe('Error Handling', () => {
-    it('should return null on invalid token', async () => {
+  describe('Caching Behavior', () => {
+    it('should cache user response for subsequent requests', async () => {
       const req = {
         headers: {
-          authorization: 'Bearer invalid-token',
+          authorization: 'Bearer cache-token-1',
         },
       };
-
-      const user = await getUserFromToken(req);
-      expect(user).toBeNull();
+      const user1 = await getUserFromToken(req);
+      const user2 = await getUserFromToken(req);
+      expect(user1).toEqual(user2);
     });
 
     it('should handle getUser errors gracefully', async () => {
-      const { createClient } = require('@supabase/supabase-js');
       const mockClient = createClient();
       mockClient.auth.getUser.mockImplementationOnce(async () => ({
         data: { user: null },
         error: new Error('Network error'),
       }));
-      // replace the client used by auth util as well
-      const authUtil = require('../../src/utils/auth');
-      authUtil.__setSupabaseClient && authUtil.__setSupabaseClient(mockClient);
+      __setSupabaseClient && __setSupabaseClient(mockClient);
 
       const req = {
         headers: {
           authorization: 'Bearer test-token',
         },
       };
-
       const user = await getUserFromToken(req);
       expect(user).toBeNull();
-    });
-
-    it('should handle response with null user data', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer test-token',
-        },
-      };
-
-      const user = await getUserFromToken(req);
-      expect(typeof user === 'object' || user === null).toBe(true);
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('should handle request without headers property', async () => {
-      const req = { body: {} };
-      const user = await getUserFromToken(req);
-      expect(user).toBeNull();
-    });
-
-    it('should handle multiple Bearer keywords in header', async () => {
-      const req = {
-        headers: {
-          authorization: 'Bearer Bearer token',
-        },
-      };
-      const user = await getUserFromToken(req);
-      // Behavior depends on implementation
-      expect([user, null]).toContain(user);
-    });
-
-    it('should handle very long token string', async () => {
-      const longToken = 'valid-token-' + 'x'.repeat(1000);
-      const req = {
-        headers: {
-          authorization: `Bearer ${longToken}`,
-        },
-      };
-      const user = await getUserFromToken(req);
-      expect([user, null]).toContain(user);
     });
   });
 });

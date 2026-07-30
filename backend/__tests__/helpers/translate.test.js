@@ -1,9 +1,6 @@
-/**
- * Unit tests for translate helper function
- */
+import { jest } from '@jest/globals';
 
-// Mock @xenova/transformers before importing the function
-jest.mock('@xenova/transformers', () => ({
+jest.unstable_mockModule('@xenova/transformers', () => ({
   pipeline: jest.fn(async (model, options) => {
     // Mock translation pipeline
     return jest.fn(async (text, options) => {
@@ -24,9 +21,13 @@ jest.mock('@xenova/transformers', () => ({
   }),
 }));
 
-const { translate } = require('../../server');
-const { resetAllMocks } = require('../../testUtils/mocks');
-const { pipeline } = require('@xenova/transformers');
+const { pipeline } = await import('@xenova/transformers');
+const { translate } = await import('../../server.js');
+const { resetAllMocks } = await import('../../testUtils/mocks.js');
+
+/**
+ * Unit tests for translate helper function
+ */
 
 describe('translate', () => {
   beforeEach(() => {
@@ -94,7 +95,6 @@ describe('translate', () => {
     });
 
     it('should cache translator for same language pair', async () => {
-      const pipelineCalls = jest.fn();
       jest.spyOn(console, 'error').mockImplementation();
       
       await translate('First', 'en', 'kn');

@@ -1,12 +1,6 @@
-/**
- * Integration tests for GET /history endpoint
- */
+import { jest } from '@jest/globals';
 
-const request = require('supertest');
-const { app, Analysis } = require('../../server');
-
-// Mock Supabase
-jest.mock('@supabase/supabase-js', () => ({
+jest.unstable_mockModule('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
     auth: {
       getUser: jest.fn(async (token) => {
@@ -32,6 +26,9 @@ jest.mock('@supabase/supabase-js', () => ({
     })),
   })),
 }));
+
+const request = (await import('supertest')).default;
+const { app, Analysis } = await import('../../server.js');
 
 describe('GET /history', () => {
   beforeEach(async () => {

@@ -1,8 +1,10 @@
+import { jest } from '@jest/globals';
+
 /**
  * Integration tests for authentication endpoints
  */
 
-const { resetAllMocks } = require('../../testUtils/mocks');
+import { resetAllMocks } from '../../testUtils/mocks.js';
 
 describe('Authentication Endpoints', () => {
   beforeEach(() => {

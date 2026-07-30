@@ -1,3 +1,5 @@
+import supertest from 'supertest';
+
 /**
  * Comprehensive test helper utilities for backend testing
  * Mirrors frontend patterns from src/__tests__/utils/testHelpers.tsx
@@ -105,7 +107,6 @@ function createMockAuthHeader(userId = 'test-user-123') {
  * @returns {Object} Supertest request with auth header
  */
 function createAuthenticatedRequest(app, method, path, userId = 'test-user-123') {
-  const supertest = require('supertest');
   const req = supertest(app)[method](path);
   const authHeader = createMockAuthHeader(userId);
   return req.set(authHeader);
@@ -120,7 +121,6 @@ function createAuthenticatedRequest(app, method, path, userId = 'test-user-123')
  * @returns {Object} Supertest request with file and auth
  */
 function createMultipartRequest(app, path, file, userId = 'test-user-123') {
-  const supertest = require('supertest');
   const req = createAuthenticatedRequest(app, 'post', path, userId);
   return req.attach('file', file.buffer, file.originalname);
 }
@@ -262,7 +262,7 @@ function expectAuthError(response) {
   }
 }
 
-module.exports = {
+export {
   createMockFile,
   createMockUser,
   createMockAnalysis,
@@ -279,3 +279,22 @@ module.exports = {
   expectValidSection,
   expectAuthError,
 };
+
+export default {
+  createMockFile,
+  createMockUser,
+  createMockAnalysis,
+  createMockSection,
+  createMockAuthHeader,
+  createAuthenticatedRequest,
+  createMultipartRequest,
+  parseSSEStream,
+  waitForSSEComplete,
+  clearDatabase,
+  seedDatabase,
+  createTestAnalysis,
+  expectValidAnalysis,
+  expectValidSection,
+  expectAuthError,
+};
+

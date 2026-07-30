@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
+
 /**
  * Unit tests for extractJargon helper function
  */
 
-const { extractJargon } = require('../../server');
-const { resetAllMocks } = require('../../testUtils/mocks');
+import { extractJargon } from '../../server.js';
+import { resetAllMocks } from '../../testUtils/mocks.js';
 
 describe('extractJargon', () => {
   beforeEach(() => {

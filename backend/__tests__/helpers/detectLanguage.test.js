@@ -1,28 +1,29 @@
+import { jest } from '@jest/globals';
+
+const mockFrancFn = jest.fn((text, options) => {
+  if (!text) return 'eng';
+  const lower = text.toLowerCase();
+  if (lower.includes('hello') || lower.includes('english')) return 'eng';
+  if (lower.includes('namaste') || lower.includes('hindi') || lower.includes('हिंदी') || lower.includes('नमस्ते')) return 'hin';
+  if (lower.includes('vanakkam') || lower.includes('tamil') || lower.includes('தமிழ்') || lower.includes('வணக்கம்')) return 'tam';
+  if (lower.includes('namaskara') || lower.includes('kannada') || lower.includes('ಕನ್ನಡ') || lower.includes('ಹೆಲೋ')) return 'kan';
+  if (lower.includes('telugu') || lower.includes('తెలుగు') || lower.includes('నమస్కారం')) return 'tel';
+  return 'eng';
+});
+
+jest.unstable_mockModule('franc-min', () => ({
+  default: mockFrancFn,
+  franc: mockFrancFn,
+}));
+
+const francModule = await import('franc-min');
+const franc = mockFrancFn;
+const { detectLanguage } = await import('../../server.js');
+const { resetAllMocks } = await import('../../testUtils/mocks.js');
+
 /**
  * Unit tests for detectLanguage helper function
  */
-
-// Mock franc-min before importing the function; export a function directly
-// so that require() returns a callable mock (compatible with our helper's
-// require-based import). This also makes jest.fn methods work as expected.
-jest.mock('franc-min', () => {
-  const fn = jest.fn((text, options) => {
-    if (!text) return 'eng';
-    const lower = text.toLowerCase();
-    if (lower.includes('hello') || lower.includes('english')) return 'eng';
-    if (lower.includes('namaste') || lower.includes('hindi') || lower.includes('हिंदी') || lower.includes('नमस्ते')) return 'hin';
-    if (lower.includes('vanakkam') || lower.includes('tamil') || lower.includes('தமிழ்') || lower.includes('வணக்கம்')) return 'tam';
-    if (lower.includes('namaskara') || lower.includes('kannada') || lower.includes('ಕನ್ನಡ') || lower.includes('ಹೆಲೋ')) return 'kan';
-    if (lower.includes('telugu') || lower.includes('తెలుగు') || lower.includes('నమస్కారం')) return 'tel';
-    return 'eng';
-  });
-  return fn;
-});
-const franc = require('franc-min');
-
-
-const { detectLanguage } = require('../../server');
-const { resetAllMocks } = require('../../testUtils/mocks');
 
 describe('detectLanguage', () => {
   beforeEach(() => {

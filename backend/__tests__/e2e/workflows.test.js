@@ -1,9 +1,11 @@
+import { jest } from '@jest/globals';
+
 /**
  * End-to-end integration tests for complete workflows
  */
 
-const { createMockFile, createMockAuthHeader, parseSSEStream } = require('../../testUtils/testHelpers');
-const { resetAllMocks } = require('../../testUtils/mocks');
+import { createMockFile, createMockAuthHeader, parseSSEStream } from '../../testUtils/testHelpers.js';
+import { resetAllMocks } from '../../testUtils/mocks.js';
 
 describe('E2E: Document Upload and Analysis Workflow', () => {
   beforeEach(() => {
