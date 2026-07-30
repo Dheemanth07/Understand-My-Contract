@@ -5,9 +5,12 @@ module.exports = {
   testPathIgnorePatterns: ['/__tests__/setup.js', '/server.test.js'],
   moduleFileExtensions: ['js', 'json', 'node'],
   collectCoverageFrom: [
-    '**/*.js',
+    'src/**/*.js',
+    'server.js',
+    '!**/*.test.js',
     '!**/node_modules/**',
     '!**/__tests__/**',
+    '!**/testUtils/**',
     '!**/coverage/**',
     '!jest.config.js',
     '!jest.config.cjs',
