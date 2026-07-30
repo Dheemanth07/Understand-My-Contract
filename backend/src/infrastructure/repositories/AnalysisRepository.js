@@ -1,4 +1,4 @@
-const Analysis = require("../../models/Analysis");
+import Analysis from "../../models/Analysis.js";
 
 async function create(data) {
     return Analysis.create(data);
@@ -65,7 +65,7 @@ async function deleteOne(filter) {
     return Analysis.findOneAndDelete(filter);
 }
 
-module.exports = {
+export {
     create,
     pushSection,
     setCompleted,
@@ -78,4 +78,18 @@ module.exports = {
     getById,
     deleteOne,
 };
+export default {
+    create,
+    pushSection,
+    setCompleted,
+    setFailed,
+    listUserHistory,
+    listUserHistoryPaginated,
+    findActiveProcessingDoc,
+    updateLastActive,
+    getUserGlossaries,
+    getById,
+    deleteOne,
+};
+
 

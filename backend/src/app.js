@@ -1,8 +1,11 @@
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import "dotenv/config";
+
+import uploadRouter from "./features/upload/upload.routes.js";
+import historyRouter from "./features/history/history.routes.js";
 
 const app = express();
 
@@ -68,10 +71,6 @@ const uploadLimiter = rateLimit({
     message: { error: "Too many uploads. Please wait 15 minutes before uploading more documents." }
 });
 
-// Mount routers
-const uploadRouter = require("./features/upload/upload.routes");
-const historyRouter = require("./features/history/history.routes");
-
 app.use("/upload", uploadLimiter, uploadRouter);
 app.use("/history", historyRouter);
 
@@ -84,4 +83,5 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: "Internal Server Error" });
 });
 
-module.exports = app;
+export default app;
+

@@ -1,9 +1,12 @@
-const pdfParse = require("pdf-parse");
-const mammoth = require("mammoth");
-const axios = require("axios");
-const { IGNORED_WORDS, LEGAL_DICTIONARY } = require("../shared/glossary/glossaryData");
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import mammoth from "mammoth";
+import axios from "axios";
+import * as francModule from "franc-min";
+import * as transformersModule from "@xenova/transformers";
+import { IGNORED_WORDS, LEGAL_DICTIONARY } from "../shared/glossary/glossaryData.js";
 
 const langMap = { eng: "en", kan: "kn", hin: "hi", tam: "ta", tel: "te" };
+
 
 async function extractTextFromFile(file) {
     if (!file) throw new Error("No file provided.");
@@ -88,17 +91,11 @@ async function detectLanguage(text) {
 
         let francFunc;
         try {
-            // use require so that jest.mock can intercept this import
-            // (dynamic import in tests was returning an object and breaking mocks)
-            const francModule = require("franc-min");
-            // the module may export a function directly or an object with a
-            // `franc` property (depending on how it's mocked), so handle both.
             francFunc =
                 typeof francModule === "function"
                     ? francModule
-                    : francModule.franc || francModule.default?.franc || francModule;
+                    : francModule.franc || francModule.default?.franc || francModule.default || francModule;
         } catch (e) {
-            // if the package isn't available or require fails, default to English
             francFunc = () => "eng";
         }
 
@@ -374,7 +371,7 @@ async function translate(text, src, tgt) {
     // In Jest environment, use @xenova/transformers to satisfy test expectations
     if (process.env.JEST_WORKER_ID !== undefined) {
         try {
-            const { pipeline } = require("@xenova/transformers");
+            const pipeline = transformersModule.pipeline || transformersModule.default?.pipeline;
             if (pipeline && pipeline.mock && pipeline.mock.calls && pipeline.mock.calls.length === 0) {
                 translatorCache = {};
             }
@@ -718,7 +715,7 @@ Contract text:
     return generateRuleBasedRisks(contractText);
 }
 
-module.exports = {
+export {
     extractTextFromFile,
     anonymizePII,
     splitIntoSections,

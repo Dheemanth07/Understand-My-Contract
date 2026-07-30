@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const app = require("./app");
+import mongoose from "mongoose";
+import app from "./app.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -15,7 +15,7 @@ async function connectDB() {
         console.warn(`⚠️ External MongoDB connection failed: ${err.message}`);
         console.log("ℹ️ Attempting to start in-memory MongoDB fallback...");
         try {
-            const { MongoMemoryServer } = require("mongodb-memory-server");
+            const { MongoMemoryServer } = await import("mongodb-memory-server");
             const mongoServer = await MongoMemoryServer.create();
             const mongoUri = mongoServer.getUri();
             await mongoose.connect(mongoUri);
@@ -33,7 +33,7 @@ async function connectDB() {
     }
 }
 
-if (require.main === module || (require.main && require.main.filename && (require.main.filename.endsWith("server.js") || require.main.filename.endsWith("index.js")))) {
+if (process.argv[1] && (process.argv[1].endsWith("server.js") || process.argv[1].endsWith("index.js"))) {
     connectDB().then(() => {
         app.listen(PORT, "0.0.0.0", () => {
             console.log(`✅ Server listening on port ${PORT} (0.0.0.0)...`);
@@ -41,4 +41,6 @@ if (require.main === module || (require.main && require.main.filename && (requir
     });
 }
 
-module.exports = app;
+export default app;
+export { connectDB };
+

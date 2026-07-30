@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const AnalysisSchema = new mongoose.Schema(
     {
@@ -30,4 +30,5 @@ const AnalysisSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-module.exports = mongoose.models.Analysis || mongoose.model("Analysis", AnalysisSchema);
+export default mongoose.models.Analysis || mongoose.model("Analysis", AnalysisSchema);
+

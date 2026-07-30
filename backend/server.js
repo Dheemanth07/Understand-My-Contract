@@ -1,10 +1,46 @@
-const app = require("./src/app");
-const Analysis = require("./src/models/Analysis");
-const processing = require("./src/services/processing");
-const { getUserFromToken } = require("./src/utils/auth");
-const supabase = require("./src/utils/supabaseClient");
+import app from "./src/app.js";
+import Analysis from "./src/models/Analysis.js";
+import * as processing from "./src/services/processing.js";
+import { getUserFromToken } from "./src/utils/auth.js";
+import supabase from "./src/utils/supabaseClient.js";
 
-module.exports = {
+const {
+    extractTextFromFile,
+    anonymizePII,
+    splitIntoSections,
+    detectLanguage,
+    translate,
+    summarizeSection,
+    extractJargon,
+    lookupDefinition,
+    simplifyAndTranslateWithGemini,
+    callGemini,
+    callGroq,
+    callAI,
+    analyzeRisksWithGemini,
+} = processing;
+
+export {
+    app,
+    Analysis,
+    extractTextFromFile,
+    anonymizePII,
+    splitIntoSections,
+    detectLanguage,
+    translate,
+    summarizeSection,
+    extractJargon,
+    lookupDefinition,
+    simplifyAndTranslateWithGemini,
+    callGemini,
+    callGroq,
+    callAI,
+    analyzeRisksWithGemini,
+    getUserFromToken,
+    supabase,
+};
+
+export default {
     app,
     Analysis,
     ...processing,
@@ -12,6 +48,7 @@ module.exports = {
     supabase,
 };
 
-if (require.main === module) {
-    require("./src/index");
+if (process.argv[1] && process.argv[1].endsWith("server.js")) {
+    import("./src/index.js");
 }
+

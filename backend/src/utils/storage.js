@@ -3,5 +3,6 @@ function getStorageMode() {
     return process.env.STORAGE_DRIVER || "supabase";
 }
 
-module.exports = { getStorageMode };
+export { getStorageMode };
+
 

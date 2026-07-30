@@ -84,7 +84,8 @@ const LEGAL_DICTIONARY = {
     NDA: "Non-Disclosure Agreement. A legal contract between at least two parties that outlines confidential material, knowledge, or information.",
 };
 
-module.exports = {
+export {
     IGNORED_WORDS,
     LEGAL_DICTIONARY,
 };
+

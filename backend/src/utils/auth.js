@@ -1,5 +1,6 @@
 // hold a client reference that tests can swap out
-let supabase = require("./supabaseClient");
+import defaultSupabase from "./supabaseClient.js";
+let supabase = defaultSupabase;
 
 // In-memory token cache to avoid expensive Supabase HTTP round-trips on every request (60s TTL)
 const tokenCache = new Map();
@@ -54,4 +55,5 @@ function __setSupabaseClient(client) {
     tokenCache.clear();
 }
 
-module.exports = { getUserFromToken, __setSupabaseClient };
+export { getUserFromToken, __setSupabaseClient };
+
