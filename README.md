@@ -4,8 +4,6 @@
 
 LegalSimplify is a full-stack web application built to parse, analyze, and simplify complex legal contracts into clear, plain language. It features an asynchronous section-aware NLP pipeline that dynamically breaks down documents along clause boundaries, streams section-by-section analysis to MongoDB with incremental persistence, flags high-risk legal clauses, generates automated glossaries, and exports print-ready PDF reports.
 
-![See It In Action - Side by Side Comparison](screenshots/sbs-comp.png)
-
 The project uses a modern monorepo architecture:
 - **`frontend`**: React 18 and TypeScript application powered by Vite, Tailwind CSS, and Shadcn UI components.
 - **`backend`**: Node.js and Express API built natively on ES Modules (ESM), connected to MongoDB for document storage and integrated with Supabase for user session authentication.
