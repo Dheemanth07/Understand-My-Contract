@@ -128,10 +128,13 @@ async function callGemini(prompt) {
         return null;
     }
 
-    const geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    let geminiModel = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    if (geminiModel.includes("2.0-flash-lite") || geminiModel.includes("1.5-flash-latest")) {
+        geminiModel = "gemini-2.5-flash";
+    }
 
     try {
-        console.log(`[Gemini] Calling Gemini API...`);
+        console.log(`[Gemini] Calling Gemini API (${geminiModel})...`);
         const resp = await axios.post(
             `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${geminiKey}`,
             {
@@ -154,13 +157,32 @@ async function callGemini(prompt) {
     } catch (err) {
         const status = err.response?.status;
         const errData = err.response?.data?.error;
+
+        // Auto-retry with gemini-2.5-flash if the requested model returns 404
+        if (status === 404 && geminiModel !== "gemini-2.5-flash") {
+            try {
+                console.log(`[Gemini] Model ${geminiModel} not found (404). Retrying with gemini-2.5-flash...`);
+                const retryResp = await axios.post(
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+                    { contents: [{ parts: [{ text: prompt }] }] },
+                    { headers: { "Content-Type": "application/json" }, timeout: 30000 }
+                );
+                const retryText = retryResp?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (retryText) {
+                    console.log(`[Gemini] ✅ Success with gemini-2.5-flash`);
+                    return retryText.trim();
+                }
+            } catch (retryErr) {
+                console.error("❌ Gemini fallback retry failed:", retryErr.response?.data || retryErr.message);
+            }
+        }
+
         const isQuotaError = status === 429 || (errData?.message && errData.message.includes("Quota exceeded"));
 
         if (isQuotaError) {
-            // Disable Gemini for 60 seconds so subsequent sections go straight
-            // to Hugging Face without any delay.
+            // Disable Gemini for 60 seconds so subsequent sections go straight to Groq
             geminiDisabledUntil = Date.now() + 60000;
-            console.warn(`[Gemini] Quota exceeded — falling back to Hugging Face for the next 60s.`);
+            console.warn(`[Gemini] Quota exceeded — falling back to Groq for the next 60s.`);
         } else {
             console.error("❌ Gemini API Error:", err.response?.data || err.message);
         }
@@ -169,8 +191,7 @@ async function callGemini(prompt) {
 }
 
 // ---------------------------------------------------------------------------
-// Groq fallback (LLaMA 3 — free tier, very fast, no billing needed)
-// Sign up at https://console.groq.com to get a free API key.
+// Groq fallback (Ultra-fast LLM inference)
 // ---------------------------------------------------------------------------
 let groqDisabledUntil = 0;
 
@@ -184,12 +205,17 @@ async function callGroq(prompt) {
         return null;
     }
 
+    let groqModel = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+    if (groqModel.includes("llama-3.1-8b-instant")) {
+        groqModel = "qwen/qwen3.8-27b";
+    }
+
     try {
-        console.log(`[Groq] Calling Groq API (llama-3.1-8b-instant)...`);
+        console.log(`[Groq] Calling Groq API (${groqModel})...`);
         const resp = await axios.post(
             "https://api.groq.com/openai/v1/chat/completions",
             {
-                model: "llama-3.1-8b-instant",
+                model: groqModel,
                 messages: [{ role: "user", content: prompt }],
                 max_tokens: 1024,
                 temperature: 0.3
@@ -211,6 +237,35 @@ async function callGroq(prompt) {
         return null;
     } catch (err) {
         const status = err.response?.status;
+        if (status === 404 && groqModel !== "openai/gpt-oss-120b") {
+            try {
+                console.log(`[Groq] Model ${groqModel} returned 404. Retrying with openai/gpt-oss-120b...`);
+                const retryResp = await axios.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    {
+                        model: "openai/gpt-oss-120b",
+                        messages: [{ role: "user", content: prompt }],
+                        max_tokens: 1024,
+                        temperature: 0.3
+                    },
+                    {
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${groqKey}`
+                        },
+                        timeout: 20000
+                    }
+                );
+                const retryText = retryResp?.data?.choices?.[0]?.message?.content;
+                if (retryText) {
+                    console.log(`[Groq] ✅ Success with openai/gpt-oss-120b`);
+                    return retryText.trim();
+                }
+            } catch (retryErr) {
+                console.error("❌ Groq fallback retry failed:", retryErr.response?.data || retryErr.message);
+            }
+        }
+
         if (status === 429) {
             groqDisabledUntil = Date.now() + 60000;
             console.warn(`[Groq] Quota exceeded — cooling down for 60s.`);
@@ -340,10 +395,17 @@ async function simplifyAndTranslateWithGemini(section, targetLang = "en") {
         prompt = `You are a legal expert. Simplify and summarize the following contract section into plain, easy-to-understand language, and write the final summary strictly in ${targetLangName}. Do NOT include any English version, preamble, explanation, or conversational introductory phrases. Output ONLY the raw simplified text in ${targetLangName}.\n\nSection text:\n"${section}"`;
     }
 
-    const summary = await callGemini(prompt);
-    if (summary) return summary;
+    // Tier 1: Gemini
+    const geminiSummary = await callGemini(prompt);
+    if (geminiSummary) return geminiSummary;
 
-    console.warn(`[Gemini] Processing failed, falling back to dual-step Hugging Face pipeline...`);
+    // Tier 2: Groq (ultra-fast LLM fallback)
+    console.warn(`[Gemini] Processing failed, falling back to Groq...`);
+    const groqSummary = await callGroq(prompt);
+    if (groqSummary) return groqSummary;
+
+    // Tier 3: Hugging Face / Rule-based pipeline
+    console.warn(`[AI Providers] Both Gemini and Groq unavailable, falling back to dual-step Hugging Face pipeline...`);
     const englishSummary = await summarizeSection(section);
     return await translate(englishSummary, "en", targetLang);
 }
@@ -464,6 +526,14 @@ async function translate(text, src, tgt) {
                 console.warn(`[translate] 503/504 — retrying (${retries} left)...`);
                 await new Promise((r) => setTimeout(r, 3000));
             } else {
+                // Try Gemini or Groq to translate if Hugging Face is unavailable/out of credits
+                try {
+                    const trPrompt = `Translate the following legal summary into ${resolvedTgt} language. Return ONLY the raw translated text:\n"${text}"`;
+                    const aiTr = await (callGemini(trPrompt) || callGroq(trPrompt));
+                    if (aiTr) return aiTr;
+                } catch {
+                    // ignore
+                }
                 return text;
             }
         }
@@ -478,13 +548,11 @@ async function summarizeSection(section) {
         return "(No summary returned)";
     }
 
-    // Short-text guard: BART-CNN hallucinates (e.g. outputs CNN iReporter boilerplate)
-    // when fed fewer than 15 words. Bypass the model entirely and return the
-    // original text as-is — it's already readable at that length.
+    // Short-text guard: Bypass model for short sections
     const wordCount = section.trim().split(/\s+/).length;
     console.log(`[summarize] Input word count: ${wordCount}`);
     if (wordCount < 15) {
-        console.log(`[summarize] ⚠️  Short-text guard triggered (${wordCount} words < 15) — skipping BART/Gemini, returning original text.`);
+        console.log(`[summarize] ⚠️  Short-text guard triggered (${wordCount} words < 15) — skipping models, returning original text.`);
         return section.trim();
     }
 
@@ -497,7 +565,19 @@ async function summarizeSection(section) {
         if (summary) {
             return summary;
         }
-        console.warn(`[summarize] Gemini summarization failed, falling back to BART.`);
+        console.warn(`[summarize] Gemini summarization failed, falling back to Groq.`);
+    }
+
+    // Try Groq second if key is available and not in tests
+    const groqKey = process.env.GROQ_API_KEY;
+    if (groqKey && process.env.JEST_WORKER_ID === undefined) {
+        console.log(`[summarize] Sending ${wordCount}-word section to Groq...`);
+        const prompt = `You are a legal expert. Simplify and summarize the following contract section into plain, easy-to-understand English. Keep the summary accurate, preserving key rights and obligations. Keep it concise, under 150 words.\n\nSection text:\n"${section}"`;
+        const groqSummary = await callGroq(prompt);
+        if (groqSummary) {
+            return groqSummary;
+        }
+        console.warn(`[summarize] Groq summarization failed, falling back to BART.`);
     }
 
     console.log(`[summarize] Sending ${wordCount}-word section to BART-CNN...`);
@@ -533,11 +613,13 @@ async function summarizeSection(section) {
             if (status === 503 || status === 504) {
                 retries--; await new Promise((r) => setTimeout(r, 3000));
             } else {
-                return '(Failed to summarize)';
+                // If Hugging Face is out of credits or unavailable, extract key readable sentences
+                const firstSentences = section.split(/(?<=[.?!])\s+/).slice(0, 3).join(" ").trim();
+                return firstSentences.length > 20 ? firstSentences : section.substring(0, 250);
             }
         }
     }
-    return '(Failed to summarize)';
+    return section.substring(0, 250);
 }
 
 function extractJargon(text) {
