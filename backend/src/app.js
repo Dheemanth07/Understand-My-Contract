@@ -1,13 +1,16 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import "dotenv/config";
 
 import uploadRouter from "./features/upload/upload.routes.js";
 import historyRouter from "./features/history/history.routes.js";
 
 const app = express();
+
+// Trust reverse proxy (Render, Vercel, Heroku, Cloudflare)
+app.set("trust proxy", 1);
 
 // Secure Express headers
 app.use(helmet());
@@ -47,28 +50,44 @@ app.use(cors(corsOptions));
 app.options(/^.*$/, cors(corsOptions));
 app.use(express.json());
 
+// Lightweight health check endpoint (bypasses rate limiters)
+app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
+app.get("/", (req, res) => res.status(200).json({ service: "Understand-My-Contract API", status: "online" }));
+
 app.use((req, res, next) => {
     console.log(`[HTTP] ${req.method} ${req.url}`);
     next();
 });
 
-// Global API Rate Limiter
+// Key generator: Per-user (Authorization header) when authenticated, otherwise client IP
+const getClientKey = (req) => {
+    if (req.headers && req.headers.authorization) {
+        return req.headers.authorization;
+    }
+    return ipKeyGenerator(req.ip || "127.0.0.1");
+};
+
+// Global API Rate Limiter (allows high-frequency progress polling without 429 errors)
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 300, // Limit each IP to 300 requests per 15 minutes
+    max: 2500, // Limit each client to 2500 requests per 15 minutes
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Too many requests from this IP, please try again later." }
+    keyGenerator: getClientKey,
+    skip: (req) => req.method === "OPTIONS" || req.path === "/health" || req.path === "/",
+    message: { error: "Too many requests, please try again later." }
 });
 app.use(globalLimiter);
 
-// Stricter Rate Limiter for Document Uploads
+// Rate Limiter for Document Uploads
 const uploadLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // Limit each IP to 15 document uploads per 15 minutes
+    max: 60, // Limit each client to 60 document uploads per 15 minutes
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Too many uploads. Please wait 15 minutes before uploading more documents." }
+    keyGenerator: getClientKey,
+    skip: (req) => req.method === "OPTIONS",
+    message: { error: "Too many uploads. Please wait a few minutes before uploading more documents." }
 });
 
 app.use("/upload", uploadLimiter, uploadRouter);

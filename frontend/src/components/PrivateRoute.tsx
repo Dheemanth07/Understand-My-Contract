@@ -24,13 +24,17 @@ const PrivateRoute = ({ children }: { children: ReactNode }) => {
                     sessionStorage.removeItem("activeAnalysisId");
                     sessionStorage.removeItem("uploading");
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Global active analysis heartbeat ping failed:", err);
+                if (err?.response?.status === 404 || err?.response?.status === 400 || err?.response?.status === 401 || err?.response?.status === 403) {
+                    sessionStorage.removeItem("activeAnalysisId");
+                    sessionStorage.removeItem("uploading");
+                }
             }
-        }, 3000);
+        }, 5000);
 
         return () => clearInterval(intervalId);
-    }, [session]);
+    }, [session?.access_token]);
 
     // History lock: Prevent browser Back button from exiting authenticated session to Google OAuth or signin pages
     useEffect(() => {

@@ -121,6 +121,9 @@ export default function Dashboard() {
             sessionStorage.setItem("activeAnalysisId", activeAnalysisId);
             sessionStorage.setItem("uploading", "true");
             localStorage.setItem("legalsimplify_last_doc_id", activeAnalysisId);
+        } else {
+            sessionStorage.removeItem("activeAnalysisId");
+            sessionStorage.removeItem("uploading");
         }
     }, [activeAnalysisId]);
 
@@ -162,6 +165,7 @@ export default function Dashboard() {
                             headers: { Authorization: `Bearer ${session.access_token}` },
                         });
                         if (historyResp.data && historyResp.data.length > 0) {
+                            setHistory(historyResp.data);
                             targetId = historyResp.data[0].id || historyResp.data[0]._id;
                         }
                     } catch {
@@ -193,6 +197,7 @@ export default function Dashboard() {
                     } catch (e) {
                         console.warn("Could not fetch target doc by ID, clearing saved ID:", e);
                         localStorage.removeItem("legalsimplify_last_doc_id");
+                        sessionStorage.removeItem("activeAnalysisId");
                     }
                 }
             } catch (err) {
@@ -201,20 +206,15 @@ export default function Dashboard() {
         };
 
         restoreState();
+        fetchHistory();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [session]);
+    }, [session?.user?.id]);
 
     useEffect(() => {
         window.addEventListener("scroll", checkScrollPosition, { passive: true });
         checkScrollPosition();
         return () => window.removeEventListener("scroll", checkScrollPosition);
     }, [checkScrollPosition, analysisResults, uploading, loadingHistory]);
-
-    useEffect(() => {
-        if (session) {
-            fetchHistory();
-        }
-    }, [session]);
 
     const fetchHistory = async () => {
         if (!session?.access_token) return;
@@ -261,7 +261,9 @@ export default function Dashboard() {
                     setAnalysisResults(data.sections || []);
                     setRisks(data.risks || []);
                     setUploading(false);
-                    setActiveAnalysisId(null); // also clears sessionStorage via the sync effect
+                    setActiveAnalysisId(null);
+                    sessionStorage.removeItem("activeAnalysisId");
+                    sessionStorage.removeItem("uploading");
                     if (data.filename) setActiveDocumentName(data.filename);
                     fetchHistory();
                     toast({
@@ -271,6 +273,8 @@ export default function Dashboard() {
                 } else if (data.status === "failed") {
                     setUploading(false);
                     setActiveAnalysisId(null);
+                    sessionStorage.removeItem("activeAnalysisId");
+                    sessionStorage.removeItem("uploading");
                     fetchHistory();
                     toast({
                         title: "Analysis Failed",
@@ -282,22 +286,28 @@ export default function Dashboard() {
                     setAnalysisResults(data.sections || []);
                     if (data.filename && !activeDocumentName) setActiveDocumentName(data.filename);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 console.error("Error polling progress:", err);
+                if (err?.response?.status === 404 || err?.response?.status === 400) {
+                    setUploading(false);
+                    setActiveAnalysisId(null);
+                    sessionStorage.removeItem("activeAnalysisId");
+                    sessionStorage.removeItem("uploading");
+                }
             }
         };
 
         // Fetch immediately on upload start
         pollProgress();
 
-        // High-frequency polling (600ms) for real-time section streaming
-        const intervalId = setInterval(pollProgress, 600);
+        // Optimized polling (2000ms) for streaming section updates
+        const intervalId = setInterval(pollProgress, 2000);
 
         return () => {
             isMounted = false;
             clearInterval(intervalId);
         };
-    }, [activeAnalysisId, session]);
+    }, [activeAnalysisId, session?.access_token]);
 
     const handleUpload = async () => {
         if (!file || !session?.access_token) {
