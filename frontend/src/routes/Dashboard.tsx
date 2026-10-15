@@ -1230,8 +1230,8 @@ export default function Dashboard() {
                             </div>
                         </Card>
 
-                        {/* Live Processing Card when uploading and 0 sections are populated yet */}
-                        {uploading && analysisResults.length === 0 && (
+                        {/* Live Processing Card when uploading */}
+                        {uploading && (
                             <Card className="bg-white border border-slate-200/90 p-6 shadow-sm rounded-xl space-y-4 animate-fade-in mt-4">
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="flex items-center gap-4 min-w-0">
@@ -1245,7 +1245,9 @@ export default function Dashboard() {
                                             <p className="text-xs text-slate-500 font-medium">
                                                 {isIncognito
                                                     ? "Processing strictly in-memory (Zero-Storage). Complete analysis will display once all sections finish."
-                                                    : "Extracting clauses, translating legal jargon, and auditing contract risk."}
+                                                    : analysisResults.length > 0
+                                                        ? `${analysisResults.length} section${analysisResults.length > 1 ? "s" : ""} simplified & streaming in real-time below...`
+                                                        : "Extracting clauses, translating legal jargon, and auditing contract risk."}
                                             </p>
                                         </div>
                                     </div>
@@ -1264,7 +1266,11 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="flex items-center justify-between text-[11px] font-medium text-slate-500 pt-0.5">
-                                    <span>Parsed sections will render below automatically</span>
+                                    <span>
+                                        {analysisResults.length > 0
+                                            ? `Displaying ${analysisResults.length} parsed section${analysisResults.length > 1 ? "s" : ""} below (processing remaining...)`
+                                            : "Parsed sections will render below automatically"}
+                                    </span>
                                     <span className="text-blue-600 font-semibold flex items-center gap-1.5">
                                         <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" />
                                         Active Analysis

@@ -57,21 +57,23 @@ async function processContractInBackground(analysisId, text, lang) {
                 targetLangSummary = "Summary generated from section legal text.";
             }
 
-            const terms = extractJargon(sectionText);
+            const terms = extractJargon(sectionText).slice(0, 8);
             let sectionTerms = [];
-            for (const term of terms) {
-                if (!mainGlossary[term]) {
-                    const def = await lookupDefinition(term);
-                    if (def) mainGlossary[term] = def;
-                    if (!def && !Object.prototype.hasOwnProperty.call(mainGlossary, term)) {
-                        mainGlossary[term] = null;
+            await Promise.all(
+                terms.map(async (term) => {
+                    try {
+                        if (!mainGlossary[term]) {
+                            const def = await lookupDefinition(term);
+                            if (def) mainGlossary[term] = def;
+                        }
+                        if (mainGlossary[term]) {
+                            sectionTerms.push({ term, definition: mainGlossary[term] });
+                        }
+                    } catch {
+                        // Ignore individual jargon lookup failures
                     }
-                }
-
-                if (mainGlossary[term]) {
-                    sectionTerms.push({ term, definition: mainGlossary[term] });
-                }
-            }
+                })
+            );
 
             const sectionData = {
                 original: sectionText,

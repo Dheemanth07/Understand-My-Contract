@@ -59,9 +59,11 @@ function splitIntoSections(text) {
     return rawBlocks.map((s) => s.trim()).filter(Boolean);
 }
 
+const definitionsCache = new Map();
+
 async function lookupDefinition(word) {
     if (!word || typeof word !== 'string' || word.trim() === '') {
-        return '(Definition not found)';
+        return null;
     }
     const cleanWord = word.trim();
     if (LEGAL_DICTIONARY[cleanWord]) {
@@ -72,15 +74,26 @@ async function lookupDefinition(word) {
         return LEGAL_DICTIONARY[lower];
     }
 
+    if (definitionsCache.has(cleanWord)) {
+        return definitionsCache.get(cleanWord);
+    }
+
     try {
-        const resp = await axios.get(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`);
+        const resp = await axios.get(
+            `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(cleanWord)}`,
+            { timeout: 1000 }
+        );
         const meanings = resp.data?.[0]?.meanings;
         if (!meanings || meanings.length === 0) {
-            return '(Definition not found)';
+            definitionsCache.set(cleanWord, null);
+            return null;
         }
-        return meanings[0].definitions[0].definition || '(Definition not found)';
+        const def = meanings[0].definitions[0].definition || null;
+        definitionsCache.set(cleanWord, def);
+        return def;
     } catch {
-        return '(Definition not found)';
+        definitionsCache.set(cleanWord, null);
+        return null;
     }
 }
 
