@@ -16,16 +16,28 @@ async function connectDB() {
         console.log("ℹ️ Attempting to start in-memory MongoDB fallback...");
         try {
             const { MongoMemoryServer } = await import("mongodb-memory-server");
-            const mongoServer = await MongoMemoryServer.create();
+            const mongoServer = await MongoMemoryServer.create({
+                binary: {
+                    version: process.env.MONGOMS_VERSION || "7.0.14",
+                },
+            });
             const mongoUri = mongoServer.getUri();
             await mongoose.connect(mongoUri);
             console.log(`✅ MongoDB connected to in-memory instance`);
+            if (process.env.NODE_ENV === "production") {
+                console.warn(
+                    "⚠️ WARNING: Running with in-memory MongoDB in production! Data will NOT persist across restarts or redeployments. Please fix your MONGODB_URI in Render settings."
+                );
+            }
             
-            process.on("SIGINT", async () => {
+            const cleanup = async () => {
                 await mongoose.disconnect();
                 await mongoServer.stop();
                 process.exit(0);
-            });
+            };
+
+            process.on("SIGINT", cleanup);
+            process.on("SIGTERM", cleanup);
         } catch (fallbackErr) {
             console.error("❌ Failed to start in-memory MongoDB fallback:", fallbackErr.message);
             process.exit(1);

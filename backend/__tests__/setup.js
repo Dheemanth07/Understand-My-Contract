@@ -13,7 +13,11 @@ let mongoServer = null;
 // Start MongoDB Memory Server before tests
 beforeAll(async () => {
   try {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await MongoMemoryServer.create({
+      binary: {
+        version: process.env.MONGOMS_VERSION || '7.0.14',
+      },
+    });
     const mongoUri = mongoServer.getUri();
     process.env.MONGODB_URI = mongoUri;
     
